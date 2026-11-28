@@ -51,17 +51,11 @@ public class ArrayBinder {
 					throw new CodeAnalysisException("Collection must provide parameterized type information");
 				}
 
-				Type paramType = ((ParameterizedType) parameterizedType).getActualTypeArguments()[0];
-				if (paramType instanceof Class) {
-					Class<?> arrayClass = (Class<?>) paramType;
-
-					arrayDataClass = context.componentSource(arrayClass, arrayClass);
-				} else if (paramType instanceof ParameterizedType) {
-					ParameterizedType arrayParamType = (ParameterizedType) paramType;
-					arrayDataClass = context.componentSource((Class<?>) arrayParamType.getRawType(), arrayParamType);
-				} else {
+				Type element = ((ParameterizedType) parameterizedType).getActualTypeArguments()[0];
+				if (!TypeArguments.isHeld(element)) {
 					throw new CodeAnalysisException("Unrecognized parameterized type");
 				}
+				arrayDataClass = context.componentSource(TypeArguments.erasure(element), element);
 
 			} else {
 				throw new CodeAnalysisException("Not recognised array class");
@@ -147,13 +141,13 @@ public class ArrayBinder {
 		 * and {@code CopyOnWriteArrayList} have no capacity to take, and the caller need not know which kind it
 		 * holds.
 		 */
-		static MethodHandle sized(Class<?> collectionClass) throws IllegalAccessException, CodeAnalysisException {
+		static MethodHandle sized(Class<?> collectionClass) throws CodeAnalysisException {
 			try {
-				return MethodHandles.lookup().unreflectConstructor(collectionClass.getConstructor(int.class));
+				return Members.constructor(collectionClass, collectionClass.getConstructor(int.class));
 			} catch (NoSuchMethodException capacity) {
 				try {
 					return MethodHandles.dropArguments(
-							MethodHandles.lookup().unreflectConstructor(collectionClass.getConstructor()), 0, int.class);
+							Members.constructor(collectionClass, collectionClass.getConstructor()), 0, int.class);
 				} catch (NoSuchMethodException none) {
 					throw new CodeAnalysisException(collectionClass.getName() + " has neither a public (int) nor a "
 							+ "public no-argument constructor to build it with");

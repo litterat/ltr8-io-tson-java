@@ -161,21 +161,23 @@ public class MapMapper {
                 }
                 case DataClassUnion unionClass -> {
 
-                    // Make sure this class is a member of the union before writing it.
-                    DataClass unionInstanceClass = context.getDescriptor(object.getClass());
+                    // A constant with a body is an instance of the body's class, and a member as its enum.
+                    Class<?> memberClass = object instanceof Enum<?> constant
+                            ? constant.getDeclaringClass() : object.getClass();
+                    DataClass unionInstanceClass = context.getDescriptor(memberClass);
                     if (!unionClass.isMemberType(unionInstanceClass.typeClass())) {
                         throw new IllegalArgumentException(
-                                String.format("Class '%s' not a member of union type.", object.getClass().getName()));
+                                String.format("Class '%s' not a member of union type.", memberClass.getName()));
                     }
 
                     // Using the full class name here as an example. A better/more complete implementation
                     // would use a schema based name.
                     v = toMap(unionInstanceClass, object);
                     if (tagsBesideFields(unionInstanceClass)) {
-                        ((Map<String, Object>) v).put(TAG, object.getClass().getName());
+                        ((Map<String, Object>) v).put(TAG, memberClass.getName());
                     } else {
                         Map<String, Object> tagged = new HashMap<>();
-                        tagged.put(TAG, object.getClass().getName());
+                        tagged.put(TAG, memberClass.getName());
                         tagged.put(VALUE, v);
                         v = tagged;
                     }

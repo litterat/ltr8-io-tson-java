@@ -20,7 +20,6 @@ import io.ltr8.annotation.Profile;
 import io.ltr8.bind.analysis.ComponentInfo.Role;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -58,8 +57,6 @@ public class RecordComponentFinder implements ComponentFinder {
             return;
         }
 
-        MethodHandles.Lookup lookup = MethodHandles.publicLookup();
-
         for (int x = 0; x < components.length; x++) {
             RecordComponent component = components[x];
             Method accessor = component.getAccessor();
@@ -68,8 +65,8 @@ public class RecordComponentFinder implements ComponentFinder {
             info.setConstructorArgument(x);
 
             try {
-                info.setReadMethod(readAs(lookup.unreflect(accessor), info));
-            } catch (IllegalAccessException e) {
+                info.setReadMethod(readAs(Members.virtual(clss, accessor), info));
+            } catch (CodeAnalysisException e) {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", component.getName(),
                         clss.getName()), e);
@@ -120,7 +117,6 @@ public class RecordComponentFinder implements ComponentFinder {
     private static void findProfiledComponents(Class<?> clss, Map<TypeVariable<?>, Type> bindings,
             Constructor<?> constructor, RecordComponent[] components, List<ComponentInfo> fields)
             throws CodeAnalysisException {
-        MethodHandles.Lookup lookup = MethodHandles.publicLookup();
         Profile profile = constructor.getAnnotation(Profile.class);
         String[] declared = profile == null ? new String[0] : profile.fields();
         Parameter[] parameters = constructor.getParameters();
@@ -152,8 +148,8 @@ public class RecordComponentFinder implements ComponentFinder {
             ComponentInfo info = new ComponentInfo(clss, name, type(component, bindings));
             info.setConstructorArgument(x);
             try {
-                info.setReadMethod(readAs(lookup.unreflect(component.getAccessor()), info));
-            } catch (IllegalAccessException e) {
+                info.setReadMethod(readAs(Members.virtual(clss, component.getAccessor()), info));
+            } catch (CodeAnalysisException e) {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", name, clss.getName()), e);
             }

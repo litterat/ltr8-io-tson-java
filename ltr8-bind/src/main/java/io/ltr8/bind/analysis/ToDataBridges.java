@@ -21,7 +21,6 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassBridge;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Modifier;
@@ -50,10 +49,10 @@ final class ToDataBridges {
 		}
 		Constructor<?> constructor = bridgeConstructor(targetClass, dataType);
 		try {
-			MethodHandle toObject = MethodHandles.publicLookup().unreflectConstructor(constructor);
-			MethodHandle toData = MethodHandles.publicLookup().unreflect(targetClass.getMethod(TODATA_METHOD));
+			MethodHandle toObject = Members.constructor(targetClass, constructor);
+			MethodHandle toData = Members.virtual(targetClass, targetClass.getMethod(TODATA_METHOD));
 			return new DataClassBridge(dataType, toData, toObject);
-		} catch (IllegalAccessException e) {
+		} catch (CodeAnalysisException e) {
 			throw new DataBindException(String.format(
 					"%s is not accessible through the public lookup: a bridged class is public, in a package its "
 							+ "module exports", targetClass.getName()), e);

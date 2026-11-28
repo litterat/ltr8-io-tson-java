@@ -10,10 +10,15 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 public class UnionBinder {
 
-	public UnionBinder() {
+	private final Predicate<Class<?>> describedAsUnion;
+
+	/** {@code describedAsUnion} answers whether a class's own descriptor is a union. */
+	public UnionBinder(Predicate<Class<?>> describedAsUnion) {
+		this.describedAsUnion = describedAsUnion;
 	}
 
 	public DataClassUnion resolveUnion(DataBindContext context, Class<?> targetClass, Type parameterizedType)
@@ -22,9 +27,10 @@ public class UnionBinder {
 			List<Class<?>> unionMembers = new ArrayList<>();
 			collectSealedMembers(targetClass, unionMembers);
 
-			// A leaf is final or non-sealed. Only a non-sealed one stands for classes it cannot list
+			// A member is final, sealed or non-sealed. Only a non-sealed one stands for classes it cannot list
 			// (DataClassUnion#isMemberType), so a hierarchy with none admits nothing it does not list.
-			boolean sealed = unionMembers.stream().allMatch(member -> Modifier.isFinal(member.getModifiers()));
+			boolean sealed = unionMembers.stream()
+					.allMatch(member -> Modifier.isFinal(member.getModifiers()) || member.isSealed());
 			return new DataClassUnion(targetClass, unionMembers.toArray(new Class<?>[0]), sealed);
 		}
 
@@ -55,20 +61,23 @@ public class UnionBinder {
 	}
 
 	/**
-	 * Recurses into any permitted subclass that is itself sealed, flattening a multi-level sealed
-	 * hierarchy down to its concrete leaves -- a permitted subclass must be sealed, non-sealed, or
-	 * final (the compiler enforces this), so a member that isn't itself sealed is always a genuine
-	 * leaf (a non-sealed permitted class may still gain further subclasses at runtime, unknown until
-	 * then, so it's kept as-is rather than walked into). The hierarchy is guaranteed acyclic (a
-	 * sealed type can never permit itself, directly or transitively), so this always terminates.
+	 * A permitted class is a member where an instance of it can be written as itself, and a sealed one's
+	 * permitted classes are members too. An enum is a member and is not walked into: the JDK seals an enum with
+	 * a constant body, and the class it permits is that constant's, which is written as the enum. A concrete
+	 * sealed class whose own descriptor is a union is no member: an instance of it has no descriptor but the
+	 * union, which names its members and cannot write itself as one. A non-sealed class is kept rather than
+	 * walked into, since what extends it is unknown until it is met.
 	 */
-	private static void collectSealedMembers(Class<?> sealedClass, List<Class<?>> collected) {
+	private void collectSealedMembers(Class<?> sealedClass, List<Class<?>> collected) {
 		for (Class<?> member : sealedClass.getPermittedSubclasses()) {
-			if (member.isSealed()) {
-				collectSealedMembers(member, collected);
-			} else {
+			if (!member.isSealed() || member.isEnum()) {
+				collected.add(member);
+				continue;
+			}
+			if (!Modifier.isAbstract(member.getModifiers()) && !describedAsUnion.test(member)) {
 				collected.add(member);
 			}
+			collectSealedMembers(member, collected);
 		}
 	}
 }

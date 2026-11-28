@@ -301,14 +301,15 @@ final class RecordFields {
 		}
 
 		// Looked up before the bridge is built: reflection would refuse a bridge out of the public lookup's reach naming
-		// this class as the one that cannot access it.
+		// this class as the one that cannot access it. Looked up at DataBridge's erased signature, which every
+		// implementation has: one inheriting its methods from a generic class or interface has them at that class's
+		// erasure alone, never at the types resolved here.
 		MethodHandle toData;
 		MethodHandle toObject;
+		MethodType erased = MethodType.methodType(Object.class, Object.class);
 		try {
-			toData = MethodHandles.publicLookup().findVirtual(bridgeClass, TODATA_METHOD,
-					MethodType.methodType(bridgeDataClass, bridgeObjectClass));
-			toObject = MethodHandles.publicLookup().findVirtual(bridgeClass, TOOBJECT_METHOD,
-					MethodType.methodType(bridgeObjectClass, bridgeDataClass));
+			toData = MethodHandles.publicLookup().findVirtual(bridgeClass, TODATA_METHOD, erased);
+			toObject = MethodHandles.publicLookup().findVirtual(bridgeClass, TOOBJECT_METHOD, erased);
 		} catch (IllegalAccessException e) {
 			throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: "
 					+ "%sis a class the public lookup cannot access", targetClass.getName(), bridgeOf), e);
