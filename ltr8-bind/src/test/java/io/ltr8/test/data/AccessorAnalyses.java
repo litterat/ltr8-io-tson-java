@@ -1881,6 +1881,118 @@ public final class AccessorAnalyses {
 		}
 	}
 
+	/** {@code chosen()} returns one of two fields by a conditional expression. */
+	public static class ChoosesBetweenTwoFields {
+
+		private final String first;
+
+		private final String second;
+
+		private final boolean left;
+
+		@Record
+		public ChoosesBetweenTwoFields(String first, String second, boolean left) {
+			this.first = first;
+			this.second = second;
+			this.left = left;
+		}
+
+		public String head() {
+			return first;
+		}
+
+		public String tail() {
+			return second;
+		}
+
+		public boolean isLeft() {
+			return left;
+		}
+
+		public String chosen() {
+			return left ? first : second;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof ChoosesBetweenTwoFields other && Objects.equals(first, other.first)
+					&& Objects.equals(second, other.second) && left == other.left;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(first, second, left);
+		}
+	}
+
+	/** {@code chosen()} returns one of two fields from two returns. */
+	public static class ReturnsEitherOfTwoFields {
+
+		private final String first;
+
+		private final String second;
+
+		private final boolean left;
+
+		@Record
+		public ReturnsEitherOfTwoFields(String first, String second, boolean left) {
+			this.first = first;
+			this.second = second;
+			this.left = left;
+		}
+
+		public String head() {
+			return first;
+		}
+
+		public String tail() {
+			return second;
+		}
+
+		public boolean isLeft() {
+			return left;
+		}
+
+		public String chosen() {
+			if (left) {
+				return first;
+			}
+			return second;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof ReturnsEitherOfTwoFields other && Objects.equals(first, other.first)
+					&& Objects.equals(second, other.second) && left == other.left;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(first, second, left);
+		}
+	}
+
+	/** The one method returning either field returns the other as well. */
+	public static class OnlyReturnsEitherOfTwoFields {
+
+		private final String first;
+
+		private final String second;
+
+		@Record
+		public OnlyReturnsEitherOfTwoFields(String first, String second) {
+			this.first = first;
+			this.second = second;
+		}
+
+		public String chosen() {
+			if (first != null) {
+				return first;
+			}
+			return second;
+		}
+	}
+
 	public static class FieldOnOneOfTwoOtherNames {
 
 		private final String name;

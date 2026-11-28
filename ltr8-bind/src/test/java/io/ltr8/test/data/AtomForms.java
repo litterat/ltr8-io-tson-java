@@ -204,6 +204,72 @@ public final class AtomForms {
 		}
 	}
 
+	public static final class InheritsMarkedAccessorWithoutWayIn extends CodeBase {
+
+		public InheritsMarkedAccessorWithoutWayIn(String code) {
+			super(code);
+		}
+	}
+
+	public interface DefaultText extends ToData<String> {
+
+		String text();
+
+		@Override
+		default String toData() {
+			return text();
+		}
+	}
+
+	public static final class InheritsDefaultToData implements DefaultText {
+
+		private final String text;
+
+		@Atom
+		public InheritsDefaultToData(String text) {
+			this.text = text;
+		}
+
+		@Override
+		public String text() {
+			return text;
+		}
+	}
+
+	interface HiddenDefaultText extends ToData<String> {
+
+		String text();
+
+		@Override
+		default String toData() {
+			return text();
+		}
+	}
+
+	/** Its way out is reached through it, since the public lookup cannot access the interface declaring it. */
+	public static final class InheritsDefaultToDataOfAHiddenInterface implements HiddenDefaultText {
+
+		private final String text;
+
+		@Atom
+		public InheritsDefaultToDataOfAHiddenInterface(String text) {
+			this.text = text;
+		}
+
+		@Override
+		public String text() {
+			return text;
+		}
+	}
+
+	public interface InterfaceAtom extends ToData<String> {
+
+		@Atom
+		static InterfaceAtom of(String text) {
+			return () -> text;
+		}
+	}
+
 	// --- enums
 
 	public enum Plain { ONE, TWO }
@@ -217,6 +283,15 @@ public final class AtomForms {
 
 		@Atom
 		public RecordWithAtomConstructor {
+		}
+	}
+
+	/** Described, a record; registered as an atom, a way out with no way in. */
+	public record RecordWithAtomAccessor(String code) {
+
+		@Atom
+		public String code() {
+			return code;
 		}
 	}
 

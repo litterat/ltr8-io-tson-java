@@ -524,49 +524,20 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
   it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
   `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
-- [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
-  ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
-  `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
   descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
   Move them out of the main sources, to the test sources or an examples source set the tests depend on, drop the
   export, and correct the `tson-java` skill's `api.md`, which lists it.
-- [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
-  `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
-  reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, so
-  `@Unbound` on an explicit canonical constructor's parameter is unbound to the binder and missed by both readers; the
-  first takes the name from the accessor's `@Field` alone and tests it with `isEmpty` where the binder uses `isBlank`,
-  the second uses Java names, and both answer nothing for a class that is no record. Both loop over
-  `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the descriptor, or
-  delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter in each stack. In
-  the same two modules, `DataClassObjectWriter.writeUnion` and the JSON root write look a member up by
-  `value.getClass()`, which for an enum constant with a body is its anonymous class, no member of any union (read, not
-  run): use `getDeclaringClass()` for an enum, as the two mappers do.
-- [ ] **A method parameter's binding annotation is never read.** `setX(@Field("y") String x)` on a `@Record`
-  getter/setter class binds the component as "x" and drops the annotation, silently (reproduced by probe): the member
-  scan does not reach a method's parameters on a described class. Take a setter's parameter as a member of its
-  component, or refuse the annotation, with a round trip of such a class.
 - [ ] **An accessor overridden with a computed body is read through the override.** `ImmutableFinder` matches a super
   class's `f()` returning `f` as the accessor, and virtual dispatch reaches a subclass's `f() { return "computed"; }`,
   so the class writes `{f=computed}` and a round trip loses the stored value (reproduced by probe). Reach the field
   without dispatch, or refuse an accessor overridden by a method that does not return its field, with a round trip.
-- [ ] **A method returning one of two fields is a candidate accessor for both.** `ImmutableFinder.examineAccessor`
-  takes every field a body returns, so `return flag ? a : b;` is a candidate for `a` and for `b`, and with no named
-  method beside it, the sole accessor of each (read, not run). Take a method as a candidate only where it returns one
-  field, with a test of such a class.
-- [ ] **`@Atom` is neither applied nor refused on a class described as something else.** `getDescriptor` ignores it
-  in six positions (probed): on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or
-  accessor; on a sealed or `@Union` type, such as a static factory; on an enum's methods; on an instance method of a
-  record, union, map, collection or `ToData` class with no way in; on a method of an interface an atom implements;
-  and on a super class's static factory, seen from a subclass. Refuse each, as `ComponentAnnotations.refuseUnread`
-  refuses `@Field`, `@Union` and `@Unbound`, with a refusal per position.
-- [ ] **A record with `@Atom` on its accessor, registered as an atom, is a bare atom.** It marks no way in, so
-  `atomForm` returns `null` and `registerAtom(Class)` registers a `DataClassAtom` with no bridge, the mark ignored
-  (reproduced by probe). Refuse it, as a class carrying `@Atom` on its type with no way in is refused.
-- [ ] **`Members.declarerDownTo` walks an interface by `getSuperclass()`.** For a described interface and a method
-  it inherits from a super-interface, the walk reaches `null` and throws `NullPointerException` (read, not run; no
-  caller passes an interface). Walk the super-interfaces, or refuse an interface naming it.
+- [ ] **`@Atom` is neither applied nor refused in two positions, each awaiting a ruling.** `getDescriptor` ignores
+  it on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or accessor, where only
+  `registerAtom` reads it; and on an instance method of an interface, which an atom implementing it may or may not
+  take as its way out. Rule on each: refuse it, as `ComponentAnnotations.refuseAtom` refuses `@Atom` on a class
+  described as something else (`UnreadAtomRefusalTest`), or apply it, with a test either way.
 - [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
   says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
   `Field`'s says nothing of several members: each attribute is taken from whichever member states it, two stating one

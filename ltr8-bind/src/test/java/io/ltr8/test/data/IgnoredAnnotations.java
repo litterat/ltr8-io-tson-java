@@ -134,6 +134,14 @@ public final class IgnoredAnnotations {
 		}
 	}
 
+	@Tuple
+	public record TupleMethodParameter(String x) {
+
+		public TupleMethodParameter with(@Field("x") String x) {
+			return new TupleMethodParameter(x);
+		}
+	}
+
 	// --- a @Transparent record
 
 	@Transparent
@@ -256,6 +264,54 @@ public final class IgnoredAnnotations {
 		@Union({ String.class })
 		public Object derived() {
 			return x;
+		}
+	}
+
+	/** A setter with no getter is no pair. */
+	@Record
+	public static class SetterParameterOfNoPair {
+
+		private String x;
+
+		public SetterParameterOfNoPair() {
+		}
+
+		public String getX() {
+			return x;
+		}
+
+		public void setX(String x) {
+			this.x = x;
+		}
+
+		public void setOnly(@Field("only") String only) {
+		}
+	}
+
+	public record MethodParameterOfNoComponent(String x) {
+
+		public MethodParameterOfNoComponent with(@Union({ String.class }) Object y) {
+			return new MethodParameterOfNoComponent(String.valueOf(y));
+		}
+	}
+
+	public record StaticMethodParameterAnnotated(String x) {
+
+		public static StaticMethodParameterAnnotated of(@Unbound String x) {
+			return new StaticMethodParameterAnnotated(x);
+		}
+	}
+
+	/** Another profile's components are instance members; a static method's parameter is none. */
+	public record ProfiledStaticMethodParameter(String x, String y) {
+
+		@Profile(value = "p", fields = { "x" })
+		public ProfiledStaticMethodParameter(String x) {
+			this(x, null);
+		}
+
+		public static ProfiledStaticMethodParameter of(@Field("o") String x) {
+			return new ProfiledStaticMethodParameter(x);
 		}
 	}
 
@@ -433,6 +489,29 @@ public final class IgnoredAnnotations {
 		}
 	}
 
+	public static class ParameterLabelledBase {
+
+		private String title;
+
+		public String getTitle() {
+			return title;
+		}
+
+		public void setTitle(@Field("heading") String title) {
+			this.title = title;
+		}
+	}
+
+	/** Its setter overrides the super class's, whose parameter names the component. */
+	@Record
+	public static class SetterOverrideKeepsParameterLabel extends ParameterLabelledBase {
+
+		@Override
+		public void setTitle(String title) {
+			super.setTitle(title);
+		}
+	}
+
 	// --- an interface's method
 
 	public interface Labelled {
@@ -489,6 +568,15 @@ public final class IgnoredAnnotations {
 		public String derived() {
 			return x;
 		}
+	}
+
+	public interface Touched {
+
+		default void touch(@Field("t") String at) {
+		}
+	}
+
+	public record ImplementsTouched(String x) implements Touched {
 	}
 
 	/** An interface's field is inherited, and static. */
@@ -572,6 +660,25 @@ public final class IgnoredAnnotations {
 
 		ConstructorParameterOfEnum(@Field("c") String code) {
 		}
+	}
+
+	public enum EnumMethodParameter {
+		RED;
+
+		public String code(@Field("c") String prefix) {
+			return prefix;
+		}
+	}
+
+	public enum ConstantBodyMethodParameter {
+		RED {
+			@Override
+			public Object code(@Unbound String prefix) {
+				return prefix;
+			}
+		};
+
+		public abstract Object code(String prefix);
 	}
 
 	public enum ConstantBodyWithMethod {

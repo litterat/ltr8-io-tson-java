@@ -25,6 +25,7 @@ import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.AccessorAnalyses.AccessorBesidePublicFinalField;
 import io.ltr8.test.data.AccessorAnalyses.BindsOnePublicMutableField;
+import io.ltr8.test.data.AccessorAnalyses.ChoosesBetweenTwoFields;
 import io.ltr8.test.data.AccessorAnalyses.EmptyUnionOnBoth;
 import io.ltr8.test.data.AccessorAnalyses.FieldOnOneOfTwoOtherNames;
 import io.ltr8.test.data.AccessorAnalyses.GetterBesideOtherName;
@@ -33,7 +34,9 @@ import io.ltr8.test.data.AccessorAnalyses.IsBesideOtherName;
 import io.ltr8.test.data.AccessorAnalyses.NameBesideInheritedOtherName;
 import io.ltr8.test.data.AccessorAnalyses.NamedAndGetter;
 import io.ltr8.test.data.AccessorAnalyses.OneOtherName;
+import io.ltr8.test.data.AccessorAnalyses.OnlyReturnsEitherOfTwoFields;
 import io.ltr8.test.data.AccessorAnalyses.OnlyToStringReturnsField;
+import io.ltr8.test.data.AccessorAnalyses.ReturnsEitherOfTwoFields;
 import io.ltr8.test.data.AccessorAnalyses.OtherNameBesideInheritedOtherName;
 import io.ltr8.test.data.AccessorAnalyses.TwoOtherNames;
 import io.ltr8.test.data.AccessorAnalyses.InheritsGenericPublicField;
@@ -599,6 +602,31 @@ class AccessorAnalysisTest {
 				refusedAmbiguous(TwoOtherNames.class, "TwoOtherNames.label(), TwoOtherNames.title()"),
 				refusedAmbiguous(OtherNameBesideInheritedOtherName.class,
 						"OtherNameBesideInheritedOtherName.title(), OtherNameBase.label()"));
+	}
+
+	@Test
+	void aMethodReturningOneOfTwoFieldsIsAnAccessorOfNeither() {
+		assertAll(
+				() -> assertEquals(List.of("first:String", "second:String", "left:boolean"),
+						fields(ChoosesBetweenTwoFields.class)),
+				() -> assertReadThroughMethod(field(ChoosesBetweenTwoFields.class, 0), "head"),
+				() -> assertReadThroughMethod(field(ChoosesBetweenTwoFields.class, 1), "tail"),
+				() -> assertReadThroughMethod(field(ReturnsEitherOfTwoFields.class, 0), "head"),
+				() -> assertReadThroughMethod(field(ReturnsEitherOfTwoFields.class, 1), "tail"),
+				() -> roundTrips(List.of(new ChoosesBetweenTwoFields("a", "b", true),
+						new ChoosesBetweenTwoFields("a", "b", false), new ReturnsEitherOfTwoFields("a", "b", true),
+						new ReturnsEitherOfTwoFields("a", "b", false))));
+	}
+
+	@Test
+	void aFieldWhoseOnlyMethodAlsoReturnsAnotherFieldHasNoAccessor() {
+		assertAll(Stream.of(1, 2).<Executable>map(run -> () -> {
+			CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+					() -> DataBindContext.builder().build().getDescriptor(OnlyReturnsEitherOfTwoFields.class));
+			assertEquals("Failed to match immutable field accessor for class: " + OnlyReturnsEitherOfTwoFields.class
+					+ ". Add @Field annotations to assist field 'first'", refused.getMessage(), "context " + run);
+			assertNull(refused.getCause(), "context " + run);
+		}));
 	}
 
 	private Executable refusedAmbiguous(Class<?> type, String methods) {

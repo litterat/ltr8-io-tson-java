@@ -28,6 +28,7 @@ import io.ltr8.test.data.ToDataBridges.AbstractWithConstructor;
 import io.ltr8.test.data.ToDataBridges.Carrier;
 import io.ltr8.test.data.ToDataBridges.ConstructorTakesSubtype;
 import io.ltr8.test.data.ToDataBridges.ConstructorTakesSupertype;
+import io.ltr8.test.data.ToDataBridges.DeclaresToDataInheritingADefault;
 import io.ltr8.test.data.ToDataBridges.InheritsFromBase;
 import io.ltr8.test.data.ToDataBridges.InheritsFromInterface;
 import io.ltr8.test.data.ToDataBridges.InheritsThroughTypeArgument;
@@ -117,6 +118,18 @@ class ToDataBridgeTest {
 	@Test
 	void aSubclassRedeclaringItsBasesToDataBridges() throws Throwable {
 		bridged(RedeclaresToData.class, Problem.class);
+	}
+
+	@Test
+	void aClassDeclaringToDataWithAnInterfacesDefaultToDataBridges() throws Throwable {
+		bridged(DeclaresToDataInheritingADefault.class, SkuNotFound.class);
+
+		MapMapper mapMapper = new MapMapper(context);
+		Map<String, Object> map = mapMapper.toMap(new DeclaresToDataInheritingADefault(new SkuNotFound("D-4")));
+		assertEquals(Map.of("sku", "D-4"), map);
+		DeclaresToDataInheritingADefault rebuilt = assertInstanceOf(DeclaresToDataInheritingADefault.class,
+				mapMapper.toObject(DeclaresToDataInheritingADefault.class, map));
+		assertEquals("D-4", rebuilt.sku());
 	}
 
 	// --- refused: ToData reached other than by the class's own declaration

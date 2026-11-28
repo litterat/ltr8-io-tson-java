@@ -73,6 +73,17 @@ class JsonObjectWriterTest {
     public record Painted(Colour colour, boolean filled) {
     }
 
+    /** {@code HEAVY} has a body, so it is an instance of an anonymous subclass of {@code Weight}. */
+    public enum Weight {
+        LIGHT,
+        HEAVY {
+            @Override
+            public String toString() {
+                return "heavy";
+            }
+        }
+    }
+
     public sealed interface Shape permits Circle, Square {
     }
 
@@ -142,6 +153,12 @@ class JsonObjectWriterTest {
             Painted painted = new Painted(Colour.GREEN, true);
             assertEquals("{\"colour\":\"GREEN\",\"filled\":true}", WRITER.toJson(painted));
             assertEquals(painted, roundTrip(painted, Painted.class));
+        }
+
+        @Test
+        void writes_an_enum_constant_with_a_body_as_its_enum() {
+            assertEquals("\"HEAVY\"", WRITER.toJson(Weight.HEAVY));
+            assertEquals(Weight.HEAVY, roundTrip(Weight.HEAVY, Weight.class));
         }
 
         @Test

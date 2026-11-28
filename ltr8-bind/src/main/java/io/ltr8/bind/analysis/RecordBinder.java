@@ -56,8 +56,9 @@ public class RecordBinder {
 			if (ToData.class.isAssignableFrom(targetClass)) {
 
 				bridge = ToDataBridges.resolveBridge(targetClass);
-				ComponentAnnotations.refuseUnread(targetClass, "is bridged through ToData to "
-						+ bridge.dataClass().getName() + ", which describes it");
+				String written = "is bridged through ToData to " + bridge.dataClass().getName() + ", which describes it";
+				ComponentAnnotations.refuseUnread(targetClass, written);
+				ComponentAnnotations.refuseAtom(targetClass, written);
 
 				DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
 

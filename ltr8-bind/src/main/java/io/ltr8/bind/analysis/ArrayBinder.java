@@ -29,6 +29,9 @@ public class ArrayBinder {
 
 	public DataClassArray resolveArray(DataBindContext context, Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
+		if (!targetClass.isArray()) {
+			ComponentAnnotations.refuseAtom(targetClass, "is a collection, written as its elements");
+		}
 		DataClassArray descriptor = null;
 
 		try {
