@@ -161,6 +161,37 @@ final class TypeArguments {
     }
 
     /**
+     * {@code container}'s type arguments as {@code target}, described at {@code parameterizedType}, supplies them: a
+     * subclass fixing them in its supertype supplies them itself, and one passing its own parameters on supplies what
+     * it is described with. A parameter the description leaves unsupplied stays a {@link TypeVariable} of
+     * {@code target}, and a wildcard stays a wildcard. {@code null} where {@code target} reaches {@code container}
+     * through a raw type.
+     */
+    static Type[] containerArguments(Class<?> target, Type parameterizedType, Class<?> container) {
+        // A copy as Type[]: substitution stores classes into it.
+        Type[] arguments = target == container ? Arrays.copyOf(container.getTypeParameters(),
+                container.getTypeParameters().length, Type[].class) : arguments(target, container);
+        if (arguments == null) {
+            return null;
+        }
+        Map<TypeVariable<?>, Type> bindings = new HashMap<>();
+        if (parameterizedType instanceof ParameterizedType parameterized && parameterized.getRawType() == target) {
+            TypeVariable<?>[] parameters = target.getTypeParameters();
+            Type[] supplied = parameterized.getActualTypeArguments();
+            for (int i = 0; i < parameters.length && i < supplied.length; i++) {
+                bindings.put(parameters[i], supplied[i]);
+            }
+        }
+        substitute(arguments, bindings);
+        return arguments;
+    }
+
+    /** Whether {@code argument} is a type parameter of {@code target} its description left unsupplied. */
+    static boolean unsupplied(Type argument, Class<?> target) {
+        return argument instanceof TypeVariable<?> variable && variable.getGenericDeclaration() == target;
+    }
+
+    /**
      * Whether two types are one, compared by structure: a {@link ParameterizedType} {@link #substitute} builds has no
      * owner type and is not equal to the JDK's of the same type where that has one.
      */

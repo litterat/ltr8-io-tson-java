@@ -10,7 +10,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -46,13 +45,11 @@ public class MapBinder {
 
 		try {
 
-			// Type erasure means the key/value types are only available via the parameterized
-			// type, the same reason ArrayBinder needs it for a Collection's element type.
-			if (!(parameterizedType instanceof ParameterizedType)) {
+			Type[] typeArguments = TypeArguments.containerArguments(targetClass, parameterizedType, Map.class);
+			if (typeArguments == null || TypeArguments.unsupplied(typeArguments[0], targetClass)
+					|| TypeArguments.unsupplied(typeArguments[1], targetClass)) {
 				throw new CodeAnalysisException("Map must provide parameterized type information");
 			}
-
-			Type[] typeArguments = ((ParameterizedType) parameterizedType).getActualTypeArguments();
 			Supplier<DataClass> keyDataClass = resolveTypeArgument(context, typeArguments[0]);
 			Supplier<DataClass> valueDataClass = resolveTypeArgument(context, typeArguments[1]);
 
