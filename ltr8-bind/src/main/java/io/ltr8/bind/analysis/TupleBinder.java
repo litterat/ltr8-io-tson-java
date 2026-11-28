@@ -1,11 +1,11 @@
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.FieldOrder;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassTuple;
+import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Constructor;
@@ -26,15 +26,12 @@ public class TupleBinder {
 
 	}
 
-	public DataClassTuple resolveTuple(DataBindContext context, Class<?> targetClass) throws DataBindException {
-		if (!targetClass.isRecord()) {
-			// @Tuple only targets ElementType.TYPE, so ClassBinder only reaches here for
-			// classes actually carrying the annotation -- this is a misuse guard, not a routing
-			// check: only a genuine Java record has record components / a canonical constructor
-			// to resolve positionally in the first place.
+	public DataClassTuple resolveTuple(DataBindContext context, ClassSignals signals) throws DataBindException {
+		Class<?> targetClass = signals.type();
+		if (!signals.has(Signal.JDK_RECORD)) {
 			throw new CodeAnalysisException("@Tuple can only be applied to a genuine Java record: " + targetClass);
 		}
-		if (targetClass.isAnnotationPresent(FieldOrder.class)) {
+		if (signals.fieldOrder() != null) {
 			throw new CodeAnalysisException(targetClass.getName() + " carries @FieldOrder, but is a @Tuple, whose "
 					+ "elements are its record components in declared order; an order applies only to a class "
 					+ "described by its own components");

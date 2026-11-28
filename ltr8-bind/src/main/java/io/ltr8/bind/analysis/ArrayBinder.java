@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
+import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 
 import java.lang.invoke.MethodHandle;
@@ -27,9 +28,10 @@ public class ArrayBinder {
 
 	}
 
-	public DataClassArray resolveArray(DataBindContext context, Class<?> targetClass, Type parameterizedType)
+	public DataClassArray resolveArray(DataBindContext context, ClassSignals signals, Type parameterizedType)
 			throws DataBindException {
-		if (!targetClass.isArray()) {
+		Class<?> targetClass = signals.type();
+		if (!signals.has(Signal.ARRAY)) {
 			ComponentAnnotations.refuseAtom(targetClass, "is a collection, written as its elements");
 		}
 		DataClassArray descriptor = null;
@@ -39,14 +41,14 @@ public class ArrayBinder {
 			Supplier<DataClass> arrayDataClass;
 
 			// Find the type of the Array collection.
-			if (targetClass.isArray()) {
+			if (signals.has(Signal.ARRAY)) {
 
 				// An array of a parameterized type keeps its element's arguments only in its generic type.
 				Type element = parameterizedType instanceof GenericArrayType array ? array.getGenericComponentType()
 						: targetClass.getComponentType();
 				arrayDataClass = context.componentSource(TypeArguments.erasure(element), element);
 
-			} else if (Collection.class.isAssignableFrom(targetClass)) {
+			} else if (signals.has(Signal.COLLECTION)) {
 
 				// We need the parameterizedType as type erasure means we can only get Collection type
 				// from certain places.

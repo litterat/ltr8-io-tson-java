@@ -15,15 +15,14 @@
  */
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.ToData;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -40,14 +39,15 @@ final class ToDataBridges {
 	private ToDataBridges() {
 	}
 
-	static DataClassBridge resolveBridge(Class<?> targetClass) throws DataBindException {
+	static DataClassBridge resolveBridge(ClassSignals signals) throws DataBindException {
+		Class<?> targetClass = signals.type();
 		Class<?> dataType = findToDataClass(targetClass);
-		if (targetClass.isAnnotationPresent(FieldOrder.class)) {
+		if (signals.fieldOrder() != null) {
 			throw new DataBindException(String.format("%s carries @FieldOrder, but is bridged through ToData to %s, "
 					+ "which describes it; an order applies only to a class described by its own components, so it "
 					+ "belongs on %2$s", targetClass.getName(), dataType.getName()));
 		}
-		Constructor<?> constructor = bridgeConstructor(targetClass, dataType);
+		Constructor<?> constructor = bridgeConstructor(signals, dataType);
 		try {
 			MethodHandle toObject = Members.constructor(targetClass, constructor);
 			MethodHandle toData = Members.virtual(targetClass, targetClass.getMethod(TODATA_METHOD));
@@ -135,14 +135,15 @@ final class ToDataBridges {
 		};
 	}
 
-	private static Constructor<?> bridgeConstructor(Class<?> targetClass, Class<?> dataType)
+	private static Constructor<?> bridgeConstructor(ClassSignals signals, Class<?> dataType)
 			throws DataBindException {
-		if (targetClass.isInterface()) {
+		Class<?> targetClass = signals.type();
+		if (signals.has(Signal.INTERFACE)) {
 			throw new DataBindException(String.format(
 					"%s is an interface: a bridged class is a class with a public constructor taking its record "
 							+ "type %s", targetClass.getName(), dataType.getName()));
 		}
-		if (Modifier.isAbstract(targetClass.getModifiers())) {
+		if (signals.has(Signal.ABSTRACT)) {
 			throw new DataBindException(String.format(
 					"%s is abstract: a bridged class is built from its record type %s, and an abstract class "
 							+ "cannot be built", targetClass.getName(), dataType.getName()));
