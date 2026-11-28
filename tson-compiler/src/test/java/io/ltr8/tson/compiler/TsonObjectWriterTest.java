@@ -111,6 +111,39 @@ class TsonObjectWriterTest {
         assertEquals(original, reader.read(tson, ShapeHolder.class));
     }
 
+    public sealed interface Signal permits Level, Pulse {
+    }
+
+    /** {@code HIGH} has a body, so it is an instance of an anonymous subclass of {@code Level}. */
+    public enum Level implements Signal {
+        LOW,
+        HIGH {
+            @Override
+            public String toString() {
+                return "high";
+            }
+        }
+    }
+
+    public record Pulse(int width) implements Signal {
+    }
+
+    public record SignalHolder(Signal signal) {
+    }
+
+    @Test
+    void writeUnionMemberEnumConstantWithABodyAsItsEnum() throws DataBindException {
+        SignalHolder original = new SignalHolder(Level.HIGH);
+        String tson = writer.toTson(original);
+        assertEquals("{ signal: !level \"HIGH\" }", tson);
+        assertEquals(original, reader.read(tson, SignalHolder.class));
+    }
+
+    @Test
+    void writeEnumConstantWithABodyAtTheRootAsItsEnum() {
+        assertEquals("\"HIGH\"", writer.toTson(Level.HIGH));
+    }
+
     @Test
     void writeUnionMemberWithExplicitTypenameUsesItVerbatim() throws DataBindException {
         NamedShapeHolder original = reader.read("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);

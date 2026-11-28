@@ -95,7 +95,9 @@ public final class DataClassObjectWriter {
                 out.nullValue();
                 return;
             }
-            write(value, context.getDescriptor(value.getClass()), out);
+            // An enum constant with a body is an instance of the body's anonymous class, which nothing describes.
+            write(value, context.getDescriptor(value instanceof Enum<?> constant ? constant.getDeclaringClass()
+                    : value.getClass()), out);
         } catch (DataBindException e) {
             throw new WriteException("cannot write " + value.getClass() + " as JSON: " + e.getMessage(), e);
         } catch (AnnotationsRefused refused) {
