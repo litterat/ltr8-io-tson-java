@@ -13,7 +13,6 @@
  */
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandle;
@@ -28,6 +27,9 @@ import java.util.List;
  * resolving process.
  */
 public class ComponentInfo {
+
+	// The class being described, which a member may be declared by a super class of.
+	private final Class<?> described;
 
 	private String name;
 
@@ -51,7 +53,12 @@ public class ComponentInfo {
 
 	private boolean annotated;
 
-	private Field field;
+	private String wireName;
+
+	private boolean required;
+
+	// A DataBridge implementation, or null for none.
+	private Class<?> bridge;
 
 	private Union union;
 
@@ -60,65 +67,63 @@ public class ComponentInfo {
 	private boolean unbound;
 
 
-	public ComponentInfo(String name, Type type) {
+	public ComponentInfo(Class<?> described, String name, Type type) {
+		this.described = described;
 		this.name = name;
 		this.type = type;
 		this.constructorArgument = -1;
 	}
 
-	/**
-	 * What a member is to its component, and the finder and path that found it: {@link ComponentAnnotations} reads
-	 * the annotations a member gives by its role.
-	 */
+	/** What a member is to its component, named as a refusal names it. */
 	enum Role {
-		/** A record component, on either of {@link RecordComponentFinder}'s paths. */
-		RECORD_COMPONENT,
-		/** A record's accessor, bound through its canonical constructor. */
-		RECORD_ACCESSOR,
-		/** A canonical constructor's parameter. */
-		RECORD_PARAMETER,
-		/** A record's accessor, bound through a {@code @Profile} constructor. */
-		PROFILED_ACCESSOR,
-		/** A {@code @Profile} constructor's parameter. */
-		PROFILED_PARAMETER,
+		/** A record component, which only {@code @Unbound} can target. */
+		RECORD_COMPONENT("record component"),
+		/** A record's field, which a record header's annotations always reach (JLS 8.10.3). */
+		RECORD_FIELD("field"),
+		RECORD_ACCESSOR("accessor"),
+		/** A record's canonical constructor's parameter. */
+		RECORD_PARAMETER("canonical constructor"),
+		/** A {@code @Profile} constructor's parameter, which binds a record through another shape than its own. */
+		PROFILED_PARAMETER("@Profile constructor"),
 		/** The field {@link ImmutableFinder} found a constructor parameter stored in. */
-		STORED_FIELD,
-		/** A {@code @Record} constructor's parameter, of the first component storing it. */
-		PARAMETER,
-		/** A {@code @Record} constructor's parameter, of a further component storing it. */
-		SHARED_PARAMETER,
+		STORED_FIELD("field"),
+		/** A {@code @Record} constructor's parameter. */
+		PARAMETER("constructor"),
 		/** A method {@link ImmutableFinder} matched as the component's accessor. */
-		ACCESSOR,
-		/** {@link GetSetFinder}'s public field. */
-		PUBLIC_FIELD,
-		/** {@link GetSetFinder}'s getter. */
-		GETTER,
-		/** {@link GetSetFinder}'s setter. */
-		SETTER,
-		/** A private field of the described class whose name is that of a component the class declares. */
-		PRIVATE_FIELD,
-		/** A public field that writes a constructor's component. */
-		MERGED_PUBLIC_FIELD,
-		/** The getter of a pair that writes a constructor's component. */
-		MERGED_GETTER,
-		/** The setter of a pair that writes a constructor's component. */
-		MERGED_SETTER;
+		ACCESSOR("accessor"),
+		PUBLIC_FIELD("public field"),
+		GETTER("getter"),
+		SETTER("setter"),
+		/** The private field of the class declaring the component's pair or field, of the component's name. */
+		PRIVATE_FIELD("private field");
 
-		Role merged() {
-			return switch (this) {
-				case PUBLIC_FIELD -> MERGED_PUBLIC_FIELD;
-				case GETTER -> MERGED_GETTER;
-				case SETTER -> MERGED_SETTER;
-				default -> throw new IllegalStateException(this + " is no member of a pair or public field");
-			};
+		private final String noun;
+
+		Role(String noun) {
+			this.noun = noun;
+		}
+
+		String noun() {
+			return noun;
+		}
+
+		/** Whether what this member's annotations state is the component's, whatever the others state. */
+		boolean prevails() {
+			return this == PROFILED_PARAMETER;
 		}
 	}
 
 	record Member(Role role, AnnotatedElement element) {
 	}
 
-	/** Refuses {@code element} as {@link ComponentAnnotations#admit} does. */
+	/**
+	 * Refuses {@code element} as {@link ComponentAnnotations#admit} does. An element already a member, reached again
+	 * by another finder or path, keeps the role it was first recorded with.
+	 */
 	void addMember(Role role, AnnotatedElement element) throws CodeAnalysisException {
+		if (members.stream().anyMatch(member -> member.element().equals(element))) {
+			return;
+		}
 		Member member = new Member(role, element);
 		ComponentAnnotations.admit(this, member);
 		members.add(member);
@@ -128,8 +133,10 @@ public class ComponentInfo {
 		return members;
 	}
 
-	void annotate(Field field, Union union, boolean unbound) {
-		this.field = field;
+	void annotate(String wireName, boolean required, Class<?> bridge, Union union, boolean unbound) {
+		this.wireName = wireName;
+		this.required = required;
+		this.bridge = bridge;
 		this.union = union;
 		this.unbound = unbound;
 		this.annotated = true;
@@ -144,6 +151,10 @@ public class ComponentInfo {
 		if (!annotated) {
 			throw new IllegalStateException(String.format("Component '%s' is read before its annotations are", name));
 		}
+	}
+
+	public Class<?> getDescribed() {
+		return described;
 	}
 
 	public void setName(String name) {
@@ -162,9 +173,21 @@ public class ComponentInfo {
 		this.declaringClass = declaringClass;
 	}
 
-	public Field getField() {
+	/** The component's name on the wire: its {@code @Field} value, or its Java name. */
+	public String getWireName() {
 		requireAnnotated();
-		return this.field;
+		return wireName;
+	}
+
+	public boolean isRequired() {
+		requireAnnotated();
+		return required;
+	}
+
+	/** The {@code DataBridge} class its {@code @Field} names, or null for none. */
+	public Class<?> getBridge() {
+		requireAnnotated();
+		return bridge;
 	}
 
 	public Union getUnion() {

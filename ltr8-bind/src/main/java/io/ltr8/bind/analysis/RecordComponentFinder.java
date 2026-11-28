@@ -29,6 +29,7 @@ import java.lang.reflect.TypeVariable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Finds tuple components for a genuine Java record via {@link Class#getRecordComponents()} --
@@ -60,7 +61,7 @@ public class RecordComponentFinder implements ComponentFinder {
             RecordComponent component = components[x];
             Method accessor = component.getAccessor();
 
-            ComponentInfo info = new ComponentInfo(component.getName(), type(component, bindings));
+            ComponentInfo info = new ComponentInfo(clss, component.getName(), type(component, bindings));
             info.setConstructorArgument(x);
 
             try {
@@ -71,9 +72,7 @@ public class RecordComponentFinder implements ComponentFinder {
                         clss.getName()), e);
             }
 
-            info.addMember(Role.RECORD_COMPONENT, component);
-            info.addMember(Role.RECORD_ACCESSOR, accessor);
-            info.addMember(Role.RECORD_PARAMETER, constructor.getParameters()[x]);
+            addRecordMembers(clss, info, component, constructor.getParameters()[x]);
 
             fields.add(info);
         }
@@ -127,6 +126,7 @@ public class RecordComponentFinder implements ComponentFinder {
                     clss.getName(), declared.length, parameters.length));
         }
 
+        Constructor<?> canonical = canonical(clss, components);
         Map<String, Integer> named = new HashMap<>();
         for (int x = 0; x < parameters.length; x++) {
             String name = nameOf(clss, parameters[x], declared, x);
@@ -145,7 +145,7 @@ public class RecordComponentFinder implements ComponentFinder {
                                 + "%s: a constructor parameter takes its component's type", x, clss.getName(),
                         parameters[x].getType().getTypeName(), name, component.getType().getTypeName()));
             }
-            ComponentInfo info = new ComponentInfo(name, type(component, bindings));
+            ComponentInfo info = new ComponentInfo(clss, name, type(component, bindings));
             info.setConstructorArgument(x);
             try {
                 info.setReadMethod(readAs(Members.virtual(clss, component.getAccessor()), info));
@@ -153,10 +153,36 @@ public class RecordComponentFinder implements ComponentFinder {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", name, clss.getName()), e);
             }
+            // Recorded first: it prevails over the record's own members.
             info.addMember(Role.PROFILED_PARAMETER, parameters[x]);
-            info.addMember(Role.RECORD_COMPONENT, component);
-            info.addMember(Role.PROFILED_ACCESSOR, component.getAccessor());
+            addRecordMembers(clss, info, component,
+                    canonical.getParameters()[List.of(components).indexOf(component)]);
             fields.add(info);
+        }
+    }
+
+    private static void addRecordMembers(Class<?> clss, ComponentInfo info, RecordComponent component,
+            Parameter canonicalParameter) throws CodeAnalysisException {
+        java.lang.reflect.Field field;
+        try {
+            field = clss.getDeclaredField(component.getName());
+        } catch (NoSuchFieldException e) {
+            throw new IllegalStateException(String.format("Record %s declares no field for its component '%s'",
+                    clss.getName(), component.getName()), e);
+        }
+        info.addMember(Role.RECORD_COMPONENT, component);
+        info.addMember(Role.RECORD_FIELD, field);
+        info.addMember(Role.RECORD_ACCESSOR, component.getAccessor());
+        info.addMember(Role.RECORD_PARAMETER, canonicalParameter);
+    }
+
+    private static Constructor<?> canonical(Class<?> clss, RecordComponent[] components) {
+        try {
+            return clss.getDeclaredConstructor(
+                    Stream.of(components).map(RecordComponent::getType).toArray(Class<?>[]::new));
+        } catch (NoSuchMethodException e) {
+            throw new IllegalStateException(String.format("Record %s declares no canonical constructor",
+                    clss.getName()), e);
         }
     }
 

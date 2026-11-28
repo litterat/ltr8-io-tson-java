@@ -51,7 +51,7 @@ public class GetSetFinder implements ComponentFinder {
 			if (Modifier.isPublic(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)
 					&& !Modifier.isFinal(modifiers)) {
 
-				ComponentInfo info = new ComponentInfo(classField.getName(),
+				ComponentInfo info = new ComponentInfo(clss, classField.getName(),
 						TypeArguments.resolve(TypeArguments.substitute(classField.getGenericType(), inherited), bindings));
 				info.addMember(Role.PUBLIC_FIELD, classField);
 				Class<?> erasure = info.getType();
@@ -113,7 +113,7 @@ public class GetSetFinder implements ComponentFinder {
 			}
 
 			String fieldName = Character.toLowerCase(getterName.charAt(3)) + getterName.substring(4);
-			ComponentInfo info = new ComponentInfo(fieldName, TypeArguments.resolve(type, bindings));
+			ComponentInfo info = new ComponentInfo(clss, fieldName, TypeArguments.resolve(type, bindings));
 			info.addMember(Role.GETTER, getter);
 			info.addMember(Role.SETTER, setter);
 			Class<?> erasure = info.getType();
@@ -127,29 +127,6 @@ public class GetSetFinder implements ComponentFinder {
 			getSetList.add(info);
 			members.put(info, new Member(getter.getDeclaringClass(), getter, setter));
 		}
-
-		// We can find the list in different orders from Java, so sort them before
-		// adding them as fields.
-		Collections.sort(getSetList, new Comparator<ComponentInfo>() {
-
-			@Override
-			public int compare(ComponentInfo o1, ComponentInfo o2) {
-
-				String o1Name = o1.getName();
-				Field o1Field = ComponentAnnotations.field(o1);
-				if (o1Field != null && !o1Field.value().strip().equals("")) {
-					o1Name = o1Field.value();
-				}
-
-				String o2Name = o2.getName();
-				Field o2Field = ComponentAnnotations.field(o2);
-				if (o2Field != null && !o2Field.value().strip().equals("")) {
-					o2Name = o2Field.value();
-				}
-
-				return o1Name.compareTo(o2Name);
-			}
-		});
 
 		// A field or pair writes a constructor's component only where it is that component's member: of the same name,
 		// and declared by the class the constructor stores it in (a pair by its getter's), or a pair whose getter the
@@ -168,38 +145,37 @@ public class GetSetFinder implements ComponentFinder {
 				iter.remove();
 				existingField.setWriteMethod(field.getWriteMethod());
 				for (ComponentInfo.Member merged : field.members()) {
-					existingField.addMember(merged.role().merged(), merged.element());
+					existingField.addMember(merged.role(), merged.element());
 				}
 			}
 		}
 
-		// Add any remaining.
+		// A private field is read where the class declaring the component's pair or field declares it; one the
+		// constructor stores is a member already. A super class may declare a field of the component's name too, and
+		// its annotation is not the component's.
+		Set<java.lang.reflect.Field> behind = new HashSet<>();
+		List<ComponentInfo> found = new ArrayList<>(fields);
+		found.addAll(getSetList);
+		for (ComponentInfo component : found) {
+			Class<?> declarer = declarer(component, members);
+			java.lang.reflect.Field privateField = privateField(declarer != null ? declarer : clss, component.getName());
+			if (privateField != null) {
+				component.addMember(Role.PRIVATE_FIELD, privateField);
+				behind.add(privateField);
+			}
+		}
+		// A private field of no component is off the wire already, unless @Field puts it there.
+		for (java.lang.reflect.Field classField : clss.getDeclaredFields()) {
+			if (isPrivateInstance(classField) && !behind.contains(classField)
+					&& classField.isAnnotationPresent(Field.class)) {
+				throw new CodeAnalysisException(String
+						.format("Could not find matching getter/setter for field '%s'", classField.getName()));
+			}
+		}
+
+		// Reflection finds them in no fixed order. Sorted once every member is known, since any may name one.
+		getSetList.sort(Comparator.comparing(ComponentAnnotations::wireName));
 		fields.addAll(getSetList);
-
-		// Check any private fields to see if we need to capture Field annotations.
-		// After adding getters/setters because we might pick up fields that are found using immutable
-		// finder.
-		java.lang.reflect.Field[] privateFields = clss.getDeclaredFields();
-		for (java.lang.reflect.Field classField : privateFields) {
-			int modifiers = classField.getModifiers();
-			if (Modifier.isPrivate(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)) {
-
-				// A super class may declare a field or pair of this name too, and this annotation is not its.
-				ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName())
-						&& (declarer(e, members) == null || declarer(e, members) == clss))
-						.findFirst().orElse(null);
-
-				if (info == null && classField.isAnnotationPresent(Field.class)) {
-					throw new CodeAnalysisException(String
-							.format("Could not find matching getter/setter for field '%s'", classField.getName()));
-				}
-
-				// A private field of no component is off the wire already.
-				if (info != null) {
-					info.addMember(Role.PRIVATE_FIELD, classField);
-				}
-			}
-		}
 
 		// A pair the class inherits holds a value apart from any other component of its name, which the wire would
 		// carry only one of.
@@ -209,8 +185,9 @@ public class GetSetFinder implements ComponentFinder {
 					|| member.getter().getDeclaringClass() == clss && member.setter().getDeclaringClass() == clss) {
 				continue;
 			}
-			String name = wireName(pair);
-			if (fields.stream().anyMatch(other -> other != pair && wireName(other).equals(name))) {
+			String name = ComponentAnnotations.wireName(pair);
+			if (fields.stream()
+					.anyMatch(other -> other != pair && ComponentAnnotations.wireName(other).equals(name))) {
 				throw new CodeAnalysisException(String.format(
 						"%s has two components named '%s', one the pair %s and %s it inherits; @Field on the pair "
 								+ "names one apart",
@@ -235,9 +212,18 @@ public class GetSetFinder implements ComponentFinder {
 		return member != null ? member.declarer() : component.getDeclaringClass();
 	}
 
-	private static String wireName(ComponentInfo component) {
-		Field field = ComponentAnnotations.field(component);
-		return field != null && !field.value().isBlank() ? field.value() : component.getName();
+	private static boolean isPrivateInstance(java.lang.reflect.Field field) {
+		int modifiers = field.getModifiers();
+		return Modifier.isPrivate(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers);
+	}
+
+	private static java.lang.reflect.Field privateField(Class<?> declarer, String name) {
+		try {
+			java.lang.reflect.Field field = declarer.getDeclaredField(name);
+			return isPrivateInstance(field) ? field : null;
+		} catch (NoSuchFieldException e) {
+			return null;
+		}
 	}
 
 	private static String qualified(Method method) {

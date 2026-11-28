@@ -21,12 +21,13 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.test.data.BridgedFields.NumberAsText;
+import io.ltr8.test.data.BridgedFields.RecordingNumberAsText;
 
 import java.util.Objects;
 
 /**
  * Components whose {@code @Field}, {@code @Union} or {@code @Unbound} sits on one or more of the members that make
- * them: for each way a class exposes a component, which of those members the analysis reads.
+ * them, for each way a class exposes a component.
  */
 public final class AnnotatedMembers {
 
@@ -94,6 +95,31 @@ public final class AnnotatedMembers {
 		}
 	}
 
+	public record HeaderValueAccessorRequired(@Field("a") String x) {
+
+		@Override
+		@Field(required = true)
+		public String x() {
+			return x;
+		}
+	}
+
+	public record HeaderBridgeBesideAccessorBridge(@Field(bridge = NumberAsText.class) Integer x) {
+
+		@Override
+		@Field(bridge = RecordingNumberAsText.class)
+		public Integer x() {
+			return x;
+		}
+	}
+
+	public record ExplicitCanonicalParameterBridge(Integer x) {
+
+		public ExplicitCanonicalParameterBridge(@Field(bridge = NumberAsText.class) Integer x) {
+			this.x = x;
+		}
+	}
+
 	public record HeaderUnion(@Union({ String.class, Integer.class }) Object tag) {
 	}
 
@@ -138,7 +164,87 @@ public final class AnnotatedMembers {
 		}
 	}
 
+	public record UnboundHeader(String name, @Unbound int cache) {
+	}
+
 	// --- a record bound through a @Profile constructor taking a subset of its components
+
+	public record ProfiledParameterBesideHeader(@Field("a") String x, String y) {
+
+		@Profile(value = "p", fields = { "x" })
+		public ProfiledParameterBesideHeader(@Field("b") String x) {
+			this(x, null);
+		}
+	}
+
+	/** The record's own members disagree on the name, which the profile's parameter states. */
+	public record ProfiledParameterOverDisagreement(@Field("a") String x, String y) {
+
+		@Profile(value = "p", fields = { "x" })
+		public ProfiledParameterOverDisagreement(@Field("b") String x) {
+			this(x, null);
+		}
+
+		@Override
+		@Field("c")
+		public String x() {
+			return x;
+		}
+	}
+
+	/** The record's own members disagree on the name, which the profile's parameter leaves unstated. */
+	public record ProfiledSilentParameterBesideDisagreement(@Field("a") String x, String y) {
+
+		@Profile(value = "p", fields = { "x" })
+		public ProfiledSilentParameterBesideDisagreement(@Field(required = true) String x) {
+			this(x, null);
+		}
+
+		@Override
+		@Field("c")
+		public String x() {
+			return x;
+		}
+	}
+
+	public record ProfiledParameterRequiredBesideHeaderName(@Field("a") String x, String y) {
+
+		@Profile(value = "p", fields = { "x" })
+		public ProfiledParameterRequiredBesideHeaderName(@Field(required = true) String x) {
+			this(x, null);
+		}
+	}
+
+	public record ProfiledHeaderBridge(@Field(bridge = NumberAsText.class) Integer x, String y) {
+
+		@Profile(value = "p", fields = { "x" })
+		public ProfiledHeaderBridge(Integer x) {
+			this(x, null);
+		}
+	}
+
+	public record ProfiledParameterUnionBesideHeader(@Union({ String.class }) Object tag, String y) {
+
+		@Profile(value = "p", fields = { "tag" })
+		public ProfiledParameterUnionBesideHeader(@Union({ String.class, Integer.class }) Object tag) {
+			this(tag, null);
+		}
+	}
+
+	public record ProfiledSilentParameterBesideUnionDisagreement(@Union({ String.class, Integer.class }) Object tag,
+			String y) {
+
+		@Profile(value = "p", fields = { "tag" })
+		public ProfiledSilentParameterBesideUnionDisagreement(Object tag) {
+			this(tag, null);
+		}
+
+		@Override
+		@Union({ String.class })
+		public Object tag() {
+			return tag;
+		}
+	}
 
 	public record ProfiledFieldsBesideParameterField(String x, String y) {
 
@@ -356,6 +462,38 @@ public final class AnnotatedMembers {
 		}
 
 		@Field("x")
+		public Integer x() {
+			return x;
+		}
+	}
+
+	/** Each member states one attribute. */
+	public static final class ConstructorAttributesOnThreeMembers {
+
+		@Field("a")
+		private final Integer x;
+
+		@Record
+		public ConstructorAttributesOnThreeMembers(@Field(required = true) Integer x) {
+			this.x = x;
+		}
+
+		@Field(bridge = NumberAsText.class)
+		public Integer x() {
+			return x;
+		}
+	}
+
+	public static final class ConstructorBridgesDiffer {
+
+		private final Integer x;
+
+		@Record
+		public ConstructorBridgesDiffer(@Field(bridge = NumberAsText.class) Integer x) {
+			this.x = x;
+		}
+
+		@Field(bridge = RecordingNumberAsText.class)
 		public Integer x() {
 			return x;
 		}
@@ -779,6 +917,76 @@ public final class AnnotatedMembers {
 
 		public void setTag(Object tag) {
 			this.tag = tag;
+		}
+	}
+
+	@Record
+	public static class PairUnionsDiffer {
+
+		@Union({ String.class, Integer.class })
+		private Object tag;
+
+		public PairUnionsDiffer() {
+		}
+
+		@Union({ String.class })
+		public Object getTag() {
+			return tag;
+		}
+
+		public void setTag(Object tag) {
+			this.tag = tag;
+		}
+	}
+
+	public static class PairBase {
+
+		@Field("a")
+		private String x;
+
+		public String getX() {
+			return x;
+		}
+
+		public void setX(String x) {
+			this.x = x;
+		}
+	}
+
+	/** The private field behind the pair is the super class's, which declares the pair. */
+	@Record
+	public static class PairInheritedPrivateField extends PairBase {
+
+		public PairInheritedPrivateField() {
+		}
+	}
+
+	/** The pairs sort by wire name, which the first pair takes from its private field. */
+	@Record
+	public static class PairOrderFollowsPrivateFieldName {
+
+		@Field("z")
+		private String a;
+
+		private String m;
+
+		public PairOrderFollowsPrivateFieldName() {
+		}
+
+		public String getA() {
+			return a;
+		}
+
+		public void setA(String a) {
+			this.a = a;
+		}
+
+		public String getM() {
+			return m;
+		}
+
+		public void setM(String m) {
+			this.m = m;
 		}
 	}
 

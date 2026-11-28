@@ -86,6 +86,7 @@ import io.ltr8.test.data.AccessorAnalyses.UnionSealingDiffers;
 import io.ltr8.test.data.AccessorAnalyses.Wraps;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
@@ -211,14 +212,26 @@ class AccessorAnalysisTest {
 	}
 
 	@Test
-	void unionsThatDifferAreRefusedNamingTheField() {
-		assertAll(Stream.of(UnionMembersDiffer.class, UnionSealingDiffers.class, UnionOnFieldDiffers.class)
-				.map(type -> () -> {
-					CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
-							() -> context.getDescriptor(type), type.getName());
-					assertEquals("Field 'tag' has @Union annotations that differ", refused.getMessage());
-					assertNull(refused.getCause());
-				}));
+	void unionsThatDifferAreRefusedNamingTheFieldAndBothMembers() {
+		String both = "@Union({java.lang.String.class, java.lang.Integer.class})";
+		String text = "@Union({java.lang.String.class})";
+		assertAll(
+				refusedNaming(UnionMembersDiffer.class, both + " on parameter 0 of the constructor "
+						+ "UnionMembersDiffer(Object) but " + text + " on the accessor UnionMembersDiffer.tag()"),
+				refusedNaming(UnionSealingDiffers.class, both + " on parameter 0 of the constructor "
+						+ "UnionSealingDiffers(Object) but @Union(value = {java.lang.String.class, "
+						+ "java.lang.Integer.class}, sealed = false) on the accessor UnionSealingDiffers.tag()"),
+				refusedNaming(UnionOnFieldDiffers.class, text + " on the field UnionOnFieldDiffers.tag but " + both
+						+ " on parameter 0 of the constructor UnionOnFieldDiffers(Object)"));
+	}
+
+	private Executable refusedNaming(Class<?> type, String members) {
+		return () -> {
+			CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+					() -> context.getDescriptor(type), type.getName());
+			assertEquals(type.getName() + "'s component 'tag' has " + members, refused.getMessage());
+			assertNull(refused.getCause());
+		};
 	}
 
 	@Test

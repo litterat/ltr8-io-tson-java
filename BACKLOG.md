@@ -517,16 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **Which members an annotation is read from differs by class kind.** `ComponentAnnotations` reads `@Field`
-  from a record's accessor on the canonical path and from its parameter on a `@Profile` path; `@Union` from a
-  record's accessor and a constructor class's members, and from no member of a `@Profile` record, a public field or
-  a getter/setter pair; and nothing but `@Unbound` from a member merged into a constructor component
-  (`ComponentAnnotationPrecedenceTest`). So `@Field("label")` on the setter of a constructor component, a record
-  header's `@Field` or `@Union` beside an explicit accessor, and `@Field(bridge = …)` on a record bound through
-  `@Profile` are each dropped, and `GetSetFinder` reads a private field of the described class alone, never one a
-  super class declares behind a pair the class inherits. Read each annotation from every member of a component,
-  taking each `@Field` attribute from whichever member states it and refusing two members that state one
-  differently, with a test of each annotation on each member of each class kind.
 - [ ] **A concrete sealed class whose own descriptor is the union cannot be written as itself.** A sealed class that
   can be instantiated and is described as a union, the root of a hierarchy or one between that is no `@Record`,
   `@Tuple` or `@Transparent`, is no member of that union, and an instance of it is refused by both mappers ("Class not
