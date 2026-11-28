@@ -170,7 +170,7 @@ class ConcreteSealedMemberTest {
 
 		@Override
 		public int hashCode() {
-			return Integer.hashCode(m);
+			return m;
 		}
 	}
 

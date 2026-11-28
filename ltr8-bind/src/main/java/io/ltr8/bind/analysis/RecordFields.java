@@ -21,6 +21,7 @@ import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassBridge;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
@@ -274,20 +275,9 @@ final class RecordFields {
 		@SuppressWarnings("rawtypes")
 		Class<? extends DataBridge> bridgeClass = info.getBridge().asSubclass(DataBridge.class);
 
-		Type[] bridgeTypes = TypeArguments.arguments(bridgeClass, DataBridge.class);
 		String bridgeOf = String.format("%s, the @Field bridge of %s's field '%s', ", bridgeClass.getName(),
 				targetClass.getName(), info.getName());
-		String converts = ": a field bridge names the classes it converts between, DataBridge<D, O>";
-		if (bridgeTypes == null) {
-			throw new CodeAnalysisException(bridgeOf + "reaches DataBridge raw" + converts);
-		}
-		boolean dataOpen = isOpen(bridgeTypes[0]);
-		boolean objectOpen = isOpen(bridgeTypes[1]);
-		if (dataOpen || objectOpen) {
-			throw new CodeAnalysisException(String.format("%simplements DataBridge<%s, %s>, leaving its %s type open%s",
-					bridgeOf, bridgeTypes[0].getTypeName(), bridgeTypes[1].getTypeName(),
-					dataOpen && objectOpen ? "data and object" : dataOpen ? "data" : "object", converts));
-		}
+		Type[] bridgeTypes = boundArguments(bridgeClass, bridgeOf, "field");
 		Type bridgeDataType = bridgeTypes[0];
 		Class<?> bridgeDataClass = bridgeTypeClass(bridgeDataType);
 		Class<?> bridgeObjectClass = bridgeTypeClass(bridgeTypes[1]);
@@ -297,19 +287,9 @@ final class RecordFields {
 		}
 
 		// Looked up before the bridge is built: reflection would refuse a bridge out of the public lookup's reach naming
-		// this class as the one that cannot access it. Looked up at DataBridge's erased signature, which every
-		// implementation has: one inheriting its methods from a generic class or interface has them at that class's
-		// erasure alone, never at the types resolved here.
-		MethodHandle toData;
-		MethodHandle toObject;
-		MethodType erased = MethodType.methodType(Object.class, Object.class);
-		try {
-			toData = MethodHandles.publicLookup().findVirtual(bridgeClass, TODATA_METHOD, erased);
-			toObject = MethodHandles.publicLookup().findVirtual(bridgeClass, TOOBJECT_METHOD, erased);
-		} catch (IllegalAccessException e) {
-			throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: "
-					+ "%sis a class the public lookup cannot access", targetClass.getName(), bridgeOf), e);
-		}
+		// this class as the one that cannot access it.
+		ErasedBridge erased = erasedMethods(bridgeClass, String.format("%s is bound through a member that is not "
+				+ "accessible: %sis a class the public lookup cannot access", targetClass.getName(), bridgeOf));
 
 		@SuppressWarnings("rawtypes")
 		DataBridge bridge;
@@ -320,8 +300,71 @@ final class RecordFields {
 		}
 
 		return new FieldBridge(bridgeDataClass, bridgeDataType,
-				toData.bindTo(bridge).asType(MethodType.methodType(bridgeDataClass, info.getType())),
-				toObject.bindTo(bridge).asType(MethodType.methodType(info.getType(), bridgeDataClass)));
+				erased.toData().bindTo(bridge).asType(MethodType.methodType(bridgeDataClass, info.getType())),
+				erased.toObject().bindTo(bridge).asType(MethodType.methodType(info.getType(), bridgeDataClass)));
+	}
+
+	/**
+	 * {@code bridge} as the form of the atom {@code targetClass}. Its object type is the atom's class itself, not a super
+	 * class: what {@code toObject} returns is taken as the atom.
+	 */
+	static DataClassBridge atomBridge(Class<?> targetClass, DataBridge<?, ?> bridge) throws CodeAnalysisException {
+		Class<?> bridgeClass = bridge.getClass();
+		String bridgeOf = String.format("%s, the bridge registered for atom %s, ", bridgeClass.getName(),
+				targetClass.getName());
+		Type[] bridgeTypes = boundArguments(bridgeClass, bridgeOf, "registered");
+		Class<?> dataClass = bridgeTypeClass(bridgeTypes[0]);
+		if (bridgeTypeClass(bridgeTypes[1]) != targetClass) {
+			throw new CodeAnalysisException(String.format("%sconverts %s, not %s", bridgeOf,
+					bridgeTypes[1].getTypeName(), targetClass.getName()));
+		}
+		ErasedBridge erased = erasedMethods(bridgeClass, bridgeOf + "is a class the public lookup cannot access");
+		return new DataClassBridge(dataClass,
+				erased.toData().bindTo(bridge).asType(MethodType.methodType(dataClass, targetClass)),
+				erased.toObject().bindTo(bridge).asType(MethodType.methodType(targetClass, dataClass)));
+	}
+
+	/**
+	 * {@code bridgeClass}'s two {@code DataBridge} arguments, refused where it reaches {@code DataBridge} raw or leaves
+	 * either open: its methods are found erased, so these are all that says what it converts.
+	 */
+	private static Type[] boundArguments(Class<?> bridgeClass, String bridgeOf, String kind)
+			throws CodeAnalysisException {
+		Type[] bridgeTypes = TypeArguments.arguments(bridgeClass, DataBridge.class);
+		String converts = ": a " + kind + " bridge names the classes it converts between, DataBridge<D, O>";
+		if (bridgeTypes == null) {
+			throw new CodeAnalysisException(bridgeOf + "reaches DataBridge raw" + converts);
+		}
+		boolean dataOpen = isOpen(bridgeTypes[0]);
+		boolean objectOpen = isOpen(bridgeTypes[1]);
+		if (dataOpen || objectOpen) {
+			throw new CodeAnalysisException(String.format("%simplements DataBridge<%s, %s>, leaving its %s type open%s",
+					bridgeOf, bridgeTypes[0].getTypeName(), bridgeTypes[1].getTypeName(),
+					dataOpen && objectOpen ? "data and object" : dataOpen ? "data" : "object", converts));
+		}
+		return bridgeTypes;
+	}
+
+	private record ErasedBridge(MethodHandle toData, MethodHandle toObject) {
+	}
+
+	/**
+	 * {@code toData} and {@code toObject} at {@code DataBridge}'s erased signature, which every implementation has: one
+	 * inheriting its methods from a generic class or interface has them at that class's erasure alone, never at the
+	 * types its arguments resolve to. Looked up by name and type rather than unreflected, so a bridge the public lookup
+	 * cannot reach is refused as {@code unreachable} over a cause naming nothing by identity.
+	 */
+	private static ErasedBridge erasedMethods(Class<?> bridgeClass, String unreachable) throws CodeAnalysisException {
+		MethodType erased = MethodType.methodType(Object.class, Object.class);
+		try {
+			return new ErasedBridge(MethodHandles.publicLookup().findVirtual(bridgeClass, TODATA_METHOD, erased),
+					MethodHandles.publicLookup().findVirtual(bridgeClass, TOOBJECT_METHOD, erased));
+		} catch (IllegalAccessException e) {
+			throw new CodeAnalysisException(unreachable, e);
+		} catch (NoSuchMethodException e) {
+			throw new IllegalStateException(bridgeClass.getName() + " implements DataBridge without its erased methods",
+					e);
+		}
 	}
 
 	/** Whether {@code type} names a type variable, itself or as an argument at any depth. */

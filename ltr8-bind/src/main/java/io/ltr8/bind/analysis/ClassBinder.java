@@ -1,6 +1,7 @@
 package io.ltr8.bind.analysis;
 
 
+import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
@@ -131,6 +132,11 @@ public class ClassBinder {
 			return atomBinder.resolveEnum(targetClass);
 		}
 		return atomBinder.resolveAtom(context, targetClass);
+	}
+
+	/** The form {@code DataBindContext.registerAtom} gives {@code targetClass} through {@code bridge}. */
+	public DataClassBridge atomBridge(Class<?> targetClass, DataBridge<?, ?> bridge) throws CodeAnalysisException {
+		return RecordFields.atomBridge(targetClass, bridge);
 	}
 
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)

@@ -95,7 +95,11 @@ public class ComponentInfo {
 		GETTER("getter"),
 		SETTER("setter"),
 		/** The private field of the class declaring the component's pair or field, of the component's name. */
-		PRIVATE_FIELD("private field");
+		PRIVATE_FIELD("private field"),
+		/** A method of a super class or an interface that a member method overrides. */
+		OVERRIDDEN("overridden method"),
+		/** A method of a subclass that overrides a member method, and that a call of it dispatches to. */
+		OVERRIDING("overriding method");
 
 		private final String noun;
 
@@ -118,15 +122,28 @@ public class ComponentInfo {
 
 	/**
 	 * Refuses {@code element} as {@link ComponentAnnotations#admit} does. An element already a member, reached again
-	 * by another finder or path, keeps the role it was first recorded with.
+	 * by another finder or path, keeps the role it was first recorded with. A method brings every method a call of
+	 * it dispatches through ({@link ComponentAnnotations#dispatchedWith}): an override inherits no annotation, and
+	 * what any declaration of the call states is stated of the component.
 	 */
 	void addMember(Role role, AnnotatedElement element) throws CodeAnalysisException {
-		if (members.stream().anyMatch(member -> member.element().equals(element))) {
+		if (!add(role, element) || !(element instanceof Method method)) {
 			return;
+		}
+		for (Method other : ComponentAnnotations.dispatchedWith(described, method)) {
+			add(method.getDeclaringClass().isAssignableFrom(other.getDeclaringClass()) ? Role.OVERRIDING
+					: Role.OVERRIDDEN, other);
+		}
+	}
+
+	private boolean add(Role role, AnnotatedElement element) throws CodeAnalysisException {
+		if (members.stream().anyMatch(member -> member.element().equals(element))) {
+			return false;
 		}
 		Member member = new Member(role, element);
 		ComponentAnnotations.admit(this, member);
 		members.add(member);
+		return true;
 	}
 
 	List<Member> members() {

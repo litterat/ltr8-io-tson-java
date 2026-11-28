@@ -16,16 +16,19 @@
 package io.ltr8.test.data;
 
 import io.ltr8.annotation.Annotations;
+import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Tuple;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.test.data.BridgedFields.NumberAsText;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -277,5 +280,342 @@ public final class IgnoredAnnotations {
 	}
 
 	public record RequiredPrimitive(@Field(required = true) int count) {
+	}
+
+	// --- a method that overrides an annotated one, or is overridden by one
+
+	public static class LabelledBase {
+
+		protected final String name;
+
+		public LabelledBase(String name) {
+			this.name = name;
+		}
+
+		@Field("label")
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((LabelledBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Its accessor overrides the super class's, which names the component. */
+	public static class OverrideKeepsLabel extends LabelledBase {
+
+		@Record
+		public OverrideKeepsLabel(String name) {
+			super(name);
+		}
+
+		@Override
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class OverrideRenames extends LabelledBase {
+
+		@Record
+		public OverrideRenames(String name) {
+			super(name);
+		}
+
+		@Override
+		@Field("renamed")
+		public String name() {
+			return name;
+		}
+	}
+
+	/** The super class's accessor is the one matched; the override, which a call dispatches to, marks it unbound. */
+	public static class OverrideUnbinds extends LabelledBase {
+
+		private final int count;
+
+		@Record
+		public OverrideUnbinds(String name, int count) {
+			super(name);
+			this.count = count;
+		}
+
+		@Override
+		@Unbound
+		public String name() {
+			return Objects.requireNonNull(super.name());
+		}
+
+		public int count() {
+			return count;
+		}
+	}
+
+	public static class TitledBase {
+
+		private String title;
+
+		@Field("heading")
+		public String getTitle() {
+			return title;
+		}
+
+		public void setTitle(String title) {
+			this.title = title;
+		}
+	}
+
+	@Record
+	public static class GetterOverrideKeepsLabel extends TitledBase {
+
+		@Override
+		public String getTitle() {
+			return super.getTitle();
+		}
+	}
+
+	public static class ValueBase<T> {
+
+		private T value;
+
+		public T getValue() {
+			return value;
+		}
+
+		@Field("v")
+		public void setValue(T value) {
+			this.value = value;
+		}
+	}
+
+	/** Its setter overrides one of another erasure, through a bridge. */
+	@Record
+	public static class GenericSetterOverride extends ValueBase<String> {
+
+		@Override
+		public String getValue() {
+			return super.getValue();
+		}
+
+		@Override
+		public void setValue(String value) {
+			super.setValue(value);
+		}
+	}
+
+	public static class PrivateNameBase {
+
+		@Field("hidden")
+		private String name() {
+			return "hidden";
+		}
+	}
+
+	/** A private method is overridden by nothing. */
+	public static class PrivateMethodOfSameName extends PrivateNameBase {
+
+		private final String name;
+
+		@Record
+		public PrivateMethodOfSameName(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	// --- an interface's method
+
+	public interface Labelled {
+
+		@Field("label")
+		String name();
+	}
+
+	public record ImplementsLabelled(String name) implements Labelled {
+	}
+
+	public record RenamesLabelled(@Field("renamed") String name) implements Labelled {
+	}
+
+	public interface Titled {
+
+		@Field("heading")
+		String getTitle();
+	}
+
+	@Record
+	public static class GetterImplementsTitled implements Titled {
+
+		private String title;
+
+		@Override
+		public String getTitle() {
+			return title;
+		}
+
+		public void setTitle(String title) {
+			this.title = title;
+		}
+	}
+
+	public interface Cached {
+
+		@Unbound
+		String cache();
+	}
+
+	public record ImplementsCached(String name, String cache) implements Cached {
+	}
+
+	public interface Derived {
+
+		@Field("d")
+		String derived();
+	}
+
+	public record DerivedOfNoComponent(String x) implements Derived {
+
+		@Override
+		public String derived() {
+			return x;
+		}
+	}
+
+	/** An interface's field is inherited, and static. */
+	public interface Keyed {
+
+		@Field("k")
+		String KEY = "key";
+	}
+
+	public record ImplementsKeyed(String x) implements Keyed {
+	}
+
+	// --- a class described by no components of its own
+
+	public record Plain(String x) {
+	}
+
+	public static final class BridgedWithField implements ToData<Plain> {
+
+		@Field("y")
+		private final String x;
+
+		public BridgedWithField(Plain plain) {
+			this.x = plain.x();
+		}
+
+		@Override
+		public Plain toData() {
+			return new Plain(x);
+		}
+	}
+
+	public static final class BridgedWithParameter implements ToData<Plain> {
+
+		private final String x;
+
+		public BridgedWithParameter(@Unbound Plain plain) {
+			this.x = plain.x();
+		}
+
+		@Override
+		public Plain toData() {
+			return new Plain(x);
+		}
+	}
+
+	public static final class AtomWithMethod {
+
+		private final String text;
+
+		@Atom
+		public AtomWithMethod(String text) {
+			this.text = text;
+		}
+
+		@Atom
+		public String toData() {
+			return text;
+		}
+
+		@Field("t")
+		public String text() {
+			return text;
+		}
+	}
+
+	public enum ConstantWithField {
+		@Field("r")
+		RED, GREEN
+	}
+
+	public enum EnumWithField {
+		RED, GREEN;
+
+		@Unbound
+		private int code;
+	}
+
+	public enum ConstructorParameterOfEnum {
+		RED("r");
+
+		ConstructorParameterOfEnum(@Field("c") String code) {
+		}
+	}
+
+	public enum ConstantBodyWithMethod {
+		RED {
+			@Override
+			@Union({ String.class })
+			public Object code() {
+				return "r";
+			}
+		};
+
+		public abstract Object code();
+	}
+
+	@Union({ ImplementsLabelled.class })
+	public interface UnionWithStatic {
+
+		@Field("k")
+		String KEY = "key";
+	}
+
+	/** The members read the union's method as their component's. */
+	public sealed interface LabelledUnion permits LabelledMember {
+
+		@Field("label")
+		String name();
+	}
+
+	public record LabelledMember(String name) implements LabelledUnion {
+	}
+
+	// --- a protocol
+
+	public record Ask(String text) {
+	}
+
+	public interface MethodAnnotatedProtocol {
+
+		@Field("asked")
+		Ask ask(Ask question);
+	}
+
+	public interface ParameterAnnotatedProtocol {
+
+		Ask ask(@Union({ Ask.class }) Ask question);
 	}
 }

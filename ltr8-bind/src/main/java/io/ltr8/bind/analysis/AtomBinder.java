@@ -142,6 +142,7 @@ public class AtomBinder {
 				: Members.staticMethod(targetClass, (Method) wayIn);
 		MethodHandle toData = Members.virtual(targetClass, wayOut.method())
 				.asType(MethodType.methodType(value, targetClass));
+		ComponentAnnotations.refuseUnread(targetClass, "is an atom bridged to " + value.getName());
 		return new DataClassAtom(targetClass, new DataClassBridge(value, toData, toObject));
 	}
 
@@ -262,6 +263,7 @@ public class AtomBinder {
 	 * shapes).
 	 */
 	public DataClassAtom resolveEnum(Class<?> targetClass) throws CodeAnalysisException {
+		ComponentAnnotations.refuseUnread(targetClass, "is an enum, written as its constant's name");
 		try {
 			EnumStringBridge bridge = new EnumStringBridge(targetClass);
 

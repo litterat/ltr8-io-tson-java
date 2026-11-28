@@ -20,9 +20,6 @@ import io.ltr8.bind.analysis.ClassBinder;
 import io.ltr8.bind.analysis.RecordBinder;
 import io.ltr8.bind.analysis.ProtocolBinder;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -661,24 +658,9 @@ public class DataBindContext {
 
 	private DataClassAtom registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) throws DataBindException {
 		checkExists(targetClass);
-
-		Class<?> bridgeClass = bridge.getClass();
-
-		try {
-			Method toDataMethod = bridgeClass.getMethod("toData", targetClass);
-			Method toObjectMethod = bridgeClass.getMethod("toObject", toDataMethod.getReturnType());
-
-			MethodHandle toData = MethodHandles.publicLookup().unreflect(toDataMethod).bindTo(bridge);
-			MethodHandle toObject = MethodHandles.publicLookup().unreflect(toObjectMethod).bindTo(bridge);
-
-			DataClassBridge dataClassBridge = new DataClassBridge(toDataMethod.getReturnType(), toData, toObject);
-			DataClassAtom dataClass = new DataClassAtom(targetClass,dataClassBridge);
-			register(targetClass, dataClass);
-			return dataClass;
-		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | DataBindException e) {
-			throw new DataBindException("Failed to register atom bridge", e);
-		}
-
+		DataClassAtom dataClass = new DataClassAtom(targetClass, dataClassResolver.atomBridge(targetClass, bridge));
+		register(targetClass, dataClass);
+		return dataClass;
 	}
 
 }
