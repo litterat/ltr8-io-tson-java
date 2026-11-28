@@ -34,6 +34,11 @@ dependencies {
     // its own right rather than by accident of another dependency's `requires transitive`.
     api(project(":tson-schema"))
 
+    // Which host class each schema entry binds to, the answer bind mode's readers are built from -- the one
+    // `tson-compiler` builds its own on, so the two encodings bind by one implementation without this module
+    // depending on that engine. `JsonCompiledSchema.binding()` hands it back, hence `api`.
+    api(project(":tson-encoding"))
+
     // Named directly now -- `@Typename`, read off a resolved body to learn which constructor it instantiates
     // -- and needed on the module path regardless, since `ltr8-bind` declares it `implementation` and that
     // does not propagate. `tson-compiler` carries the same line.

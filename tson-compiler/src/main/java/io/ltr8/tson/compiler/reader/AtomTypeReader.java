@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
-import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ValueRef;
@@ -33,9 +32,8 @@ import io.ltr8.tson.schema.meta.Top;
  * <p>Every atom-family {@link ValueReaderFactory} lives here too, as a {@code static final}
  * constant, one per constructor name -- see {@link ValueReaderFactoryRegistry} for where they
  * actually get registered. Every one of these reaches {@code context} only for
- * {@link ValueReaderContext#locationOf} (an atom never needs to resolve a child), and {@code name}
- * additionally in {@link #ENUM_OBJECT_MODE}, keyed on the declaration's own name rather than its resolved
- * shape -- see its own note.
+ * {@link ValueReaderContext#locationOf} (an atom never needs to resolve a child), and {@code name} additionally for
+ * the one entry whose parser is keyed on its name ({@link AtomParsers#forEntry}).
  */
 final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
@@ -50,7 +48,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
-            .forRead(definition, context.linked().enumForm(name))
+            .forEntry(name, definition, context.linked().enumForm(name))
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
                     context.locationOf(name), namesProfile(definition),
                     definition instanceof RefBody kind && kind.namesTypes() ? kind.of().name() : null,
@@ -59,25 +57,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition));
 
-    /**
-     * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
-     * every other enum instance its member text. Dispatch is keyed on the declaration's own name -- the one
-     * atom that needs it, and the one case {@link #ATOM} cannot serve: an enum body maps to {@link
-     * io.ltr8.tson.atom.parser.EnumParser}, which hands back the member's own text, and this one name wants the
-     * host value its two members stand for.
-     * (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
-     *
-     * <p><b>The parser is the vocabulary's own</b>, asked for by name through {@link
-     * BuiltinTypeVocabulary} -- {@code atom.parser} is unexported, and an index is how a caller reaches one.
-     * So {@code boolean} reads to the same host value with a schema and without one, and a token that is
-     * neither member is refused as the enum miss it is: {@code ATOM_CONSTRAINT_VIOLATION}, the code every
-     * other enum reports.
-     */
-    static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> "boolean".equals(name)
-            ? AtomTypeReader.of(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
-                    () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    context.locationOf(name))
-            : ATOM.create(name, definition, context);
     /**
      * {@code void_type}: not a scalar at all -- its contract admits only the void sentinel {@code _}, never a
      * token -- so it bypasses {@link AtomType} via {@link VoidReader}. Keyed on the constructor, so the

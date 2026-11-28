@@ -19,7 +19,7 @@ the spec, and the one the TypeScript port and the shared conformance suite are c
 (the text data format) and Class 2 (the schema layer) — passes the shared conformance suite, and carries a
 JSON encoding of the same data model ([TSON-JSON], Part 3, drafted in the repository).
 
-Thirteen JPMS modules, all published together as `io.ltr8:<module>`:
+Fourteen JPMS modules, all published together as `io.ltr8:<module>`:
 
 | Module           | Java module name          | What it is                                                     |
 | ---------------- | ------------------------- | -------------------------------------------------------------- |
@@ -27,6 +27,7 @@ Thirteen JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson-compiler`  | `io.ltr8.tson.compiler`   | the engine: lexer, both grammars, readers, writers, registries  |
 | `tson-base`      | `io.ltr8.tson.base`       | what every encoding shares: `Diagnostic`, `ProcessorConfig`, the policies, schema sources, host atom values |
 | `tson-atom`      | `io.ltr8.tson.atom`       | the built-in atom vocabulary: which tokens each atom accepts, what Java value results |
+| `tson-encoding`  | `io.ltr8.tson.encoding`   | `TsonSchemaBinding`: which Java class each schema type binds to, the answer both encodings' bind reads use |
 | `tson-tree`      | `io.ltr8.tson.tree`       | `TsonValue` and its node types — the read output of tree mode   |
 | `tson-schema`    | `io.ltr8.tson.schema`     | the resolved-schema value model and the registry                |
 | `ltr8-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |

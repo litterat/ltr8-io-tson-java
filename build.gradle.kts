@@ -16,6 +16,7 @@ val moduleDescriptions = mapOf(
     "tson-base" to "The diagnostic vocabulary and source positions every encoding and phase reports through",
     "tson-schema" to "TSON resolved-schema value model plus the schema registry and identity algorithm",
     "tson-atom" to "The built-in atom vocabulary: which tokens each family accepts, and what host value results",
+    "tson-encoding" to "Which host class each schema entry binds to: the one binding both encodings read objects through",
     "tson-tree" to "TSON data-document tree model: TsonValue and its pure immutable node types",
     "ltr8-bind" to "TSON binding engine between data values and Java objects",
     "ltr8-annotation" to "TSON binding annotations and the wire-annotation carrier a bound class declares",

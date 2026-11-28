@@ -13,6 +13,7 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonNull;
@@ -1368,6 +1369,8 @@ class CrossEncodingParityTest {
               fragment => { ( include: text | name?: text  type?: text ) }
               small    => { n: int32 }
               pct      => small
+              duo      => [text, int32]
+              duo_box  => { d: duo }
             }
             """;
 
@@ -1417,6 +1420,67 @@ class CrossEncodingParityTest {
                 .readAs("{\"n\": 1}", "pct", type);
     }
 
+    /** {@code type} read in TSON as {@code root} under {@code context}, from {@code body}. */
+    private static Object tsonRead(DataBindContext context, String root, String body, Class<?> type) {
+        return Tson.of(bindConfig().withDataBindContext(context)).objectReader()
+                .read("!!import:\"%s\"\n!%s %s".formatted(BIND_ID, root, body), type);
+    }
+
+    /** {@code type} read in JSON as {@code root} under {@code context}, from {@code body}. */
+    private static Object jsonRead(DataBindContext context, String root, String body, Class<?> type) {
+        Tson plain = Tson.of(bindConfig());
+        plain.resolve(BIND_SCHEMA);
+        return Json.of(ProcessorConfig.defaults().withDataBindContext(context)).withSchemas(plain.schemaRegistry())
+                .objectReader().withSchema(BIND_ID).readAs(body, root, type);
+    }
+
+    @io.ltr8.annotation.Tuple
+    public record Duo(String label, int count) {
+    }
+
+    @io.ltr8.annotation.Tuple
+    public record WideDuo(String label, long count) {
+    }
+
+    public record DuoBox(WideDuo d) {
+    }
+
+    /** A named tuple's name is what a binding map keys on ([TSON-SCHEMA] §8.2), so both read it into that class. */
+    @Test
+    void aNamedTupleBindsToTheClassItsNameIsBoundToInBoth() {
+        DataBindContext context = binding("duo", Duo.class);
+        assertEquals(new Duo("a", 3), tsonRead(context, "duo", "[a, 3]", Object.class));
+        assertEquals(new Duo("a", 3), jsonRead(context, "duo", "[\"a\", 3]", Object.class));
+    }
+
+    /**
+     * A tuple's host form is a declared class, as a record's is: read directly with none bound, neither reads a List,
+     * and both say so in one sentence, the binding's.
+     */
+    @Test
+    void aNamedTupleReadDirectlyWithNothingBoundRaisesMissingBindingInBoth() {
+        DataBindContext context = binding("small", Small.class);
+        MissingBindingException fromTson = assertThrows(MissingBindingException.class,
+                () -> tsonRead(context, "duo", "[a, 3]", Object.class));
+        MissingBindingException fromJson = assertThrows(MissingBindingException.class,
+                () -> jsonRead(context, "duo", "[\"a\", 3]", Object.class));
+        assertEquals("no bound Java class for 'duo': nothing in this bind context resolves that schema type name. "
+                + "Map it (ProcessorConfig.withDataBindContext) or give the context a DataNameBinder that can find it "
+                + "-- 'duo' is not bound: the binding map holds [small]", fromTson.getMessage());
+        assertEquals(fromTson.getMessage(), fromJson.getMessage());
+    }
+
+    /** A component declaring a tuple class binds the tuple to it, whichever class the tuple's name is bound to. */
+    @Test
+    void aNamedTupleAtAComponentBindsTheComponentsClassInBoth() {
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("duo", Duo.class, "duo_box", DuoBox.class)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+        DuoBox box = new DuoBox(new WideDuo("a", 3L));
+        assertEquals(box, tsonRead(context, "duo_box", "{ d: [a, 3] }", DuoBox.class));
+        assertEquals(box, jsonRead(context, "duo_box", "{\"d\": [\"a\", 3]}", DuoBox.class));
+    }
+
     /**
      * {@code small} has a source position, so it binds under its own name only: an alias naming it never redirects
      * its binding, and a binding map naming only the alias binds nothing, in either encoding.
@@ -1446,6 +1510,29 @@ class CrossEncodingParityTest {
             assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.getFirst().code(), problems::toString);
             assertTrue(problems.getFirst().message().contains("binds to " + Small.class.getName()), problems::toString);
         }
+    }
+
+    /**
+     * Each encoding's bind compile hands back the binding its readers were built from, and the two answer alike; a
+     * tree compile binds nothing and has none.
+     */
+    @Test
+    void bothCompiledSchemasHandBackTheBindingTheirReadsBindBy() {
+        DataBindContext context = binding("small", Small.class);
+        Tson tson = Tson.of(bindConfig().withDataBindContext(context));
+        Tson plain = Tson.of(bindConfig());
+        plain.resolve(BIND_SCHEMA);
+        JsonCompiledSchema json = JsonCompiledSchemaRegistry.bind(plain.schemaRegistry(), context).get(BIND_ID)
+                .orElseThrow();
+
+        for (TsonSchemaBinding loaded : List.of(tson.bindRegistry().get(BIND_ID).binding().orElseThrow(),
+                json.binding().orElseThrow())) {
+            assertEquals(Small.class, loaded.get("pct").orElseThrow().dataClass().typeClass());
+            assertTrue(loaded.get("person").isEmpty());
+        }
+        assertTrue(tson.treeRegistry().get(BIND_ID).binding().isEmpty());
+        assertTrue(JsonCompiledSchemaRegistry.tree(plain.schemaRegistry()).get(BIND_ID).orElseThrow().binding()
+                .isEmpty());
     }
 
     @Test

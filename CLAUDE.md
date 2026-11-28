@@ -86,6 +86,7 @@ Schema documents: **parse → desugar → resolve → link → register → comp
 | `ltr8-bind` | Generic `DataValue`↔object binding engine; knows nothing of schemas |
 | `tson-schema` | Resolved-schema value model (`schema.meta`, and a package per namespace), registry, `TsonBundledSchemas` |
 | `tson-atom` | The built-in atom vocabulary, over `String`, and §7.7's name grammar, shared by both encodings |
+| `tson-encoding` | `TsonSchemaBinding`: which host class each schema entry binds to, loaded once; both stacks bind through it |
 | `tson-tree` | `TsonValue` data tree model; depends on nothing |
 | `ltr8-regex` | RFC 9485 I-Regexp engine; depends on nothing |
 | `ltr8-net` | Network text formats (`io.ltr8.net`: URIs/IRIs, IP addresses, CIDR, EUI-48, IDNA2008 host names, media types), each to its RFC; depends on `ltr8-unicode` |

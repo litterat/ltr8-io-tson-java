@@ -13,7 +13,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.*;
 
 import java.util.*;
@@ -291,15 +290,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
 
     /**
-     * Validates what {@link #RecordBindReader} needs before ever constructing one, and owns the
-     * decision (and the {@link DataBindContext} that decision needs) about whether a record-shaped
-     * declaration also needs subtype dispatch -- keeping that concern local to this factory rather
-     * than a generic, orchestrator-level step is what keeps {@link DataBindContext} itself out of
-     * the orchestrator entirely; the orchestrator only ever calls {@link #create}, whose signature
-     * carries no {@link DataBindContext} at all. {@code context} is fixed once, at this factory's
-     * own construction, not threaded through {@link #create} -- one {@link DataBindContext} governs
-     * every entry a given compiled schema binds, the same way a {@link Factory} instance gets
-     * created once and reused across a whole compile, not once per entry.
+     * Validates what {@link #RecordBindReader} needs before ever constructing one, and owns the decision about whether
+     * a record-shaped declaration also needs subtype dispatch. Which class an entry binds to is the compile's binding's
+     * answer ({@link ValueReaderContext#bound}); {@code context}, fixed at this factory's construction, describes only
+     * what no entry names -- a labelled choice's members.
      *
      * <p><b>Three real shapes, not two.</b> When {@code context.subtypesOf(name, typeDefinition)} is empty, {@code
      * name} must resolve to a {@link DataClassRecord} -- the ordinary case, no dispatch wrapper at
@@ -336,7 +330,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // A record in place has no name a binding map holds: the component holding it says its class.
                 return new RecordInPlaceBindReader(name, body, context);
             }
-            DataClass dataClass = descriptorFor(name, typeDefinition, context);
+            DataClass dataClass = descriptorFor(name, context);
 
             if (context.subtypesOf(name, typeDefinition).isEmpty()) {
                 if (dataClass instanceof DataClassUnion union) {
@@ -363,7 +357,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // knows a schema name is not always its class's own (set -> ArrayBody, and the rest of §5's
                 // array family with it). Unresolvable is not an error here -- it just is not a member.
                 return new VariantBindReader(name, noOwnData, union, resolver,
-                        member -> boundClassOrNull(member, context));
+                        member -> context.boundClass(member).orElse(null));
             }
 
             if (dataClass instanceof DataClassRecord record) {
@@ -452,56 +446,16 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         /**
-         * The Java class {@code schemaTypeName} binds to, or {@code null} where nothing does.
+         * The class entry {@code name} binds to, as the compile's binding answers it.
          *
-         * <p>{@link #descriptorFor}'s answer without its verdict: a name that binds nowhere is a
-         * misconfiguration where a *schema* asked for it, and merely a non-member where a *document* did.
-         * Goes through this context's own {@code DataNameBinder}, which is the only thing that knows a
-         * schema name is not always its class's own -- {@code set} and {@code array} both reach {@code
-         * ArrayBody}, §5's array family resolving to one body shape.
+         * <p><b>A missing one is a misconfiguration, not a gap.</b> It is raised as {@link MissingBindingException},
+         * naming the type nothing resolves, and deferred to the first read of the type: a schema declares types a
+         * given consumer never binds. Surfacing it as a library gap instead would tell a caller who simply never
+         * mapped the type that this library cannot do the job, and that reading travels: a downstream service turns
+         * it into a 501.
          */
-        private Class<?> boundClassOrNull(String schemaTypeName, ValueReaderContext vctx) {
-            for (EntryKey candidate : vctx.linked().bindingCandidates(schemaTypeName)) {
-                try {
-                    return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
-                } catch (DataBindException | RuntimeException e) {
-                    // Not a member under this name; the next candidate is the entry's own.
-                }
-            }
-            return null;
-        }
-
-        /**
-         * The class this schema type binds to.
-         *
-         * <p><b>A missing one is a misconfiguration, not a gap.</b> It is the same disagreement {@link
-         * BindMismatchException} covers from the other side -- a class that exists and does not fit -- so
-         * it is raised the same way and at the same moment, when the schema is compiled in bind mode, naming
-         * the type nothing resolves. Surfacing it as a library gap instead would tell a caller who simply
-         * never mapped the type that this library cannot do the job, and that reading travels: a downstream
-         * service turns it into a 501.
-         */
-        private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
-            DataBindException first = null;
-            StringBuilder tried = new StringBuilder();
-            for (EntryKey candidate : vctx.linked().bindingCandidates(name)) {
-                try {
-                    return context.getDescriptor(candidate.declaringSchema(), candidate.name());
-                } catch (UnboundNameException e) {
-                    // Not bound under this name; the next candidate is tried, and the first is the one reported,
-                    // being the name the author wrote.
-                    first = first == null ? e : first;
-                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate.name());
-                } catch (DataBindException e) {
-                    // Bound, to a class this context cannot analyse: deferred like a type nobody bound (a meta
-                    // layer maps its marker kinds to interfaces nothing builds), and named for what it is.
-                    throw new MissingBindingException(e.getMessage(), e);
-                }
-            }
-            throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "
-                    + "bind context resolves that schema type name. Map it (ProcessorConfig.withDataBindContext) or give "
-                    + "the context a DataNameBinder that can find it -- "
-                    + (first == null ? "" : first.getMessage()), first);
+        static DataClass descriptorFor(String name, ValueReaderContext context) {
+            return context.bound(name).dataClass();
         }
 
         private static DataClassRecord requireRecord(String name, DataClass dataClass) {

@@ -110,9 +110,9 @@ value being one.
 **`boolean` is in that table** ([TSON-DATA] §5.5): the tokens `true` and `false`, case-sensitive, over the kernel's
 `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and `!boolean true` are one
 value — §4.2's special status for the two tokens is a base-resolution rule a typed position never reaches.
-`BooleanParser` is the one statement of what `boolean` reads; the compiled reader stack's enum factory
-(`AtomTypeReader.ENUM_OBJECT_MODE`) asks the vocabulary for it by name, which is the name-keyed read the invariant
-allows, rather than keeping a second. A token that is neither member is the enum miss it is —
+`BooleanParser` is the one statement of what `boolean` reads; `AtomParsers.forEntry` hands it out for the entry of
+that name, which is the name-keyed read the invariant allows, and both encodings' atom factories ask it rather
+than keeping a second. A token that is neither member is the enum miss it is —
 `ATOM_CONSTRAINT_VIOLATION`, matching every other enum. It stays out of `VocabularyAtoms` on `text`'s own terms: base
 resolution recovers a boolean from an unquoted `true`, so a writer annotating every one would restate the token.
 

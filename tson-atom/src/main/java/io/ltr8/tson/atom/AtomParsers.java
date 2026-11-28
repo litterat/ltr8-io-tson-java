@@ -1,5 +1,6 @@
 package io.ltr8.tson.atom;
 
+import io.ltr8.tson.atom.parser.BooleanParser;
 import io.ltr8.tson.atom.parser.BytesParser;
 import io.ltr8.tson.atom.parser.Cidr4Parser;
 import io.ltr8.tson.atom.parser.Cidr6Parser;
@@ -135,6 +136,18 @@ public final class AtomParsers {
                     : ValueRefParser.namesOnly(reference));
             default -> Optional.empty();
         };
+    }
+
+    /**
+     * {@link #forRead} for the entry {@code name} declares: {@code boolean}, an enum of {@code true} and {@code false},
+     * reads the host value its members stand for, a {@code Boolean}, through the vocabulary's own parser, so it reads
+     * alike with a schema and without one; every other entry reads as its body does.
+     */
+    public static Optional<AtomType<?>> forEntry(String name, Top body, Normalization enumForm) {
+        if (body instanceof EnumBody && BooleanParser.TYPENAME.equals(name)) {
+            return Optional.of(BooleanParser.INSTANCE);
+        }
+        return forRead(body, enumForm);
     }
 
     /**

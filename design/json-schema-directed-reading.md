@@ -72,8 +72,9 @@ component) are the whole of a structured bridge.
 
 **Bind mode reads each type to its natural host value and re-reads for a more specific component** (`BindTargets`), so
 an element of a `List<Long>` over `[int32]` is a `Long`, where `tson-compiler` reads it at the family's natural class.
-A tuple binds by its component, not its schema name, because a tuple written in place has no entry name a binding map
-could hold.
+A named tuple binds by its name, as a record does, and raises `MissingBindingException` read with nothing bound; a
+component's tuple class wins over it, re-read from the schema's position readers. A tuple written in place has no
+name a binding map could hold, and reads as a `List`.
 
 ## Record families and choices
 

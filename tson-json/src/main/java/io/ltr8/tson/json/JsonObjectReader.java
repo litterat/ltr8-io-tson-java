@@ -2,7 +2,6 @@ package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -15,9 +14,7 @@ import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
-import io.ltr8.tson.schema.EntryKey;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -437,29 +434,14 @@ public final class JsonObjectReader {
                     schema.get().declaredTypeNames(), typeName);
             return null;
         }
-        Class<?> bound = boundClass(schema.get().linkedSchema().bindingCandidates(typeName));
+        Class<?> bound = schema.get().binding().flatMap(binding -> binding.get(typeName))
+                .<Class<?>>map(binding -> binding.dataClass().typeClass()).orElse(null);
         if (bound != null && !type.isAssignableFrom(bound)) {
             report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` binds to " + bound.getName()
                     + ", which is not assignable to the requested " + type.getName(), type.getName(), bound.getName());
             return null;
         }
         return new Root(reader.get(), schema.get().rootDeclaration(typeName));
-    }
-
-    /**
-     * The class the root type is bound to under the first of its {@code candidates} that binds, as its reader binds
-     * it, or null where none does -- a container, an atom, a type the context cannot resolve. The before-read check
-     * then falls to the after-read one.
-     */
-    private Class<?> boundClass(List<EntryKey> candidates) {
-        for (EntryKey candidate : candidates) {
-            try {
-                return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
-            } catch (DataBindException | RuntimeException e) {
-                // not bound under this name; the next is tried
-            }
-        }
-        return null;
     }
 
     /** A problem stated about the read as a whole, before any of the document is read -- no pointer, no position. */

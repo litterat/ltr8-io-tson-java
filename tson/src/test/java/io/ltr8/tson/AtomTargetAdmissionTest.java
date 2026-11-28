@@ -3,7 +3,6 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
-import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import java.net.URI;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -125,18 +125,31 @@ class AtomTargetAdmissionTest {
      * {@code uri}s and none a URL, so which documents bound would depend on the protocol handlers a JVM
      * happens to carry. {@code UriParser.boundTo} states that; this states that nothing exercises it yet --
      * and that the refusal names the enclosing type rather than the component that caused it, the class
-     * having failed to resolve as a whole.
+     * having failed to resolve as a whole, when the schema is compiled to bind.
      */
     public record UriAsUrl(java.net.URL u) {
     }
 
     @Test
     void aUrlComponentIsRefusedBeforeAdmitsIsAsked() {
-        MissingBindingException e = assertThrows(MissingBindingException.class,
-                () -> tson("  t => { u: uri }", UriAsUrl.class).objectReader()
-                        .read(doc("!t { u: \"https://x.test/p\" }"), UriAsUrl.class));
-        assertTrue(e.getMessage().contains("'t' binds " + UriAsUrl.class.getName() + ", which cannot be analysed"),
-                e.getMessage());
+        BindMismatchException e = assertThrows(BindMismatchException.class,
+                () -> tson("  t => { u: uri }", UriAsUrl.class).bindRegistry().get(ID));
+        assertEquals("'t' of example.test/a-1.tn binds " + UriAsUrl.class.getName() + ", which cannot be analysed: "
+                + "Unable to find a valid data conversion for class: class java.net.URL. Bind 't' to a class this bind "
+                + "context can describe, or leave it out of the binding map", e.getMessage());
+    }
+
+    /**
+     * A class that cannot be described fails the bind compile alone: resolving the schema, and reading or validating
+     * a document as a tree, never describe the consumer's classes.
+     */
+    @Test
+    void aClassThatCannotBeDescribedFailsNoResolutionAndNoTreeRead() {
+        Tson tson = tson("  t => { u: uri }", UriAsUrl.class);
+
+        assertEquals(ID, tson.loader().resolveLinked(ID).schema().id());
+        assertEquals(List.of(), tson.validate(doc("!t { u: \"https://x.test/p\" }")));
+        assertNotNull(tson.treeReader().read(doc("!t { u: \"https://x.test/p\" }")));
     }
 
     // ── a FIXED value arrives the way a written one does ─────────────────

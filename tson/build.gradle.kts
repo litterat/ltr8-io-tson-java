@@ -22,6 +22,7 @@ dependencies {
     api(project(":tson-schema"))
     // Reachable through tson-compiler, declared here because JPMS resolution needs it present.
     api(project(":tson-atom"))
+    api(project(":tson-encoding"))
     api(project(":ltr8-bind"))
     api(project(":tson-tree"))
 

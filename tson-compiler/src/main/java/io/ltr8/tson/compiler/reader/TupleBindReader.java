@@ -5,9 +5,6 @@ import java.util.ArrayList;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
-import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.bind.UnboundNameException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.base.MissingBindingException;
@@ -15,8 +12,6 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.EntryKey;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -141,14 +136,12 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         }
     }
 
-    /** Validates both halves of what {@link #TupleBindReader} needs before ever constructing one -- {@code typeDefinition} is tuple-shaped, and {@code context} resolves {@code name} to a real, tuple-shaped {@link DataClassTuple} -- matching {@link RecordBindReader.Factory}'s own reasoning. */
+    /**
+     * Validates both halves of what {@link #TupleBindReader} needs before ever constructing one -- {@code
+     * typeDefinition} is tuple-shaped, and the compile's binding binds {@code name} to a tuple-shaped {@link
+     * DataClassTuple} -- matching {@link RecordBindReader.Factory}'s own reasoning.
+     */
     public static final class Factory implements ValueReaderFactory {
-
-        private final DataBindContext context;
-
-        public Factory(DataBindContext context) {
-            this.context = context;
-        }
 
         @Override
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
@@ -159,7 +152,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             String displayName = context.displayName(name, typeDefinition);
             DataClass dataClass;
             try {
-                dataClass = descriptorFor(name, typeDefinition, context);
+                dataClass = descriptorFor(name, context);
             } catch (MissingBindingException missing) {
                 return unbound(name, displayName, body, missing, resolver, context.locationOf(name),
                         AnnotationTypes.of(context));
@@ -178,24 +171,17 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                     AnnotationTypes.of(context));
         }
 
-        private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
-            DataBindException first = null;
-            StringBuilder tried = new StringBuilder();
-            for (EntryKey candidate : vctx.linked().bindingCandidates(name)) {
-                try {
-                    return context.getDescriptor(candidate.declaringSchema(), candidate.name());
-                } catch (UnboundNameException e) {
-                    first = first == null ? e : first;
-                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate.name());
-                } catch (DataBindException e) {
-                    throw new MissingBindingException(e.getMessage(), e);
-                }
+        /**
+         * The class tuple {@code name} binds to ({@link RecordBindReader.Factory#descriptorFor}). A tuple written in
+         * place has no name a binding map holds ([TSON-SCHEMA] §8.2), so the component holding it says its class.
+         */
+        private static DataClass descriptorFor(String name, ValueReaderContext context) {
+            if (context.tagOf(name).isEmpty()) {
+                throw new MissingBindingException("no bound Java class for the tuple written in place '" + name
+                        + "': a binding map names declarations, so a tuple written in place binds to the tuple class "
+                        + "(@Tuple) of the component holding it");
             }
-            // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.
-            throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "
-                    + "bind context resolves that schema type name. Map it (ProcessorConfig.withDataBindContext) or give "
-                    + "the context a DataNameBinder that can find it -- "
-                    + (first == null ? "" : first.getMessage()), first);
+            return RecordBindReader.Factory.descriptorFor(name, context);
         }
     }
 }

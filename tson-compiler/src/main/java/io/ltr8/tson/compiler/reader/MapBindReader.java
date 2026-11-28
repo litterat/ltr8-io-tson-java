@@ -11,7 +11,6 @@ import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -146,9 +145,10 @@ final class MapBindReader extends MapAbstractReader<Object> {
             if (!(typeDefinition instanceof MapBody body)) {
                 throw new IllegalStateException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
-            Type keyType = resolveType(body.keyType().name(), context);
+            Type keyType = context.boundClass(body.keyType().name()).orElse(String.class);
             // A value written in place has no bound class of its own: its host type is its constructor's shape.
-            Type valueType = BindTargets.hostType(body.valueType(), value -> resolveType(value, context));
+            Type valueType = BindTargets.hostType(body.valueType(),
+                    value -> context.boundClass(value).orElse(String.class));
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
             String terminal = context.linked().terminal(name);
@@ -163,18 +163,6 @@ final class MapBindReader extends MapAbstractReader<Object> {
             return new MapBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name), AnnotationTypes.of(context),
                     keysAreNames(body, context), namespace);
-        }
-
-        /** The class {@code schemaTypeName} binds to under its first candidate that binds, else {@link String}. */
-        private Class<?> resolveType(String schemaTypeName, ValueReaderContext vctx) {
-            for (EntryKey candidate : vctx.linked().bindingCandidates(schemaTypeName)) {
-                try {
-                    return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
-                } catch (DataBindException e) {
-                    // not bound under this name; the next is tried
-                }
-            }
-            return String.class;
         }
 
         private DataClass descriptorFor(Class<?> mapClass, Type type) {

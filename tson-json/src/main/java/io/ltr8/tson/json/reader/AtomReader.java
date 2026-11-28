@@ -4,7 +4,6 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonReadContext;
@@ -42,17 +41,6 @@ final class AtomReader<T> implements JsonTypeReader<T> {
      * second opinion about which parser reads which body.
      */
     static final ValueReaderFactory ATOM = AtomReader::of;
-
-    /**
-     * §5.2's enums, with {@code boolean} taken off the general path so it reads a real {@code Boolean} rather
-     * than the text {@code "true"}. The general rule still decides the <em>form</em> -- a JSON boolean or a JSON
-     * string, matched on content -- and only the host value differs, exactly as it does on the TSON side.
-     */
-    static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
-            ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
-                    () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    AtomForm.BOOLEAN, context.locationOf(name), null, false)
-            : of(name, definition, context);
 
     /** {@code void_type}: the void sentinel and nothing else, read as [TSON-JSON] §5.7 states for JSON. */
     static final ValueReaderFactory VOID = (name, definition, context) ->
@@ -96,11 +84,11 @@ final class AtomReader<T> implements JsonTypeReader<T> {
     }
 
     private static JsonTypeReader<?> of(String name, Top definition, ValueReaderContext context) {
-        AtomType<?> parser = AtomParsers.forRead(definition, context.linked().enumForm(name)).orElseThrow(
+        AtomType<?> parser = AtomParsers.forEntry(name, definition, context.linked().enumForm(name)).orElseThrow(
                 () -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition));
         IdentifierProfile names = definition instanceof IdentifierType identifier ? identifier.profile() : null;
-        return new AtomReader<>(name, parser, AtomForm.of(definition), context.locationOf(name),
+        return new AtomReader<>(name, parser, AtomForm.of(definition, parser), context.locationOf(name),
                 names, definition instanceof RefBody);
     }
 

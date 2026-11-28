@@ -24,7 +24,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
     private final Map<String, TsonTypeReader<?>> constructors;
 
     private TsonCompiledVocabulary(TsonCompiledSchema base) {
-        super(base.linkedSchema(), base.entries());
+        super(base.linkedSchema(), base.entries(), null, null, base.foreignSchemas());
         this.constructors = buildConstructors(this);
     }
 
@@ -55,7 +55,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
             } catch (RuntimeException noFactory) {
                 return unbuildable(name, noFactory);
             }
-        }, pending, checkpoint, foreign, TsonSchemaCompiler.bindingOf(resolver)));
+        }, pending, checkpoint, foreign, TsonSchemaCompiler.bindingOf(resolver), false));
     }
 
     /**

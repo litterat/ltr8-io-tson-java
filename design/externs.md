@@ -67,14 +67,17 @@ and a value read, bound and written through it in both encodings.
 - **A question about a type's shape follows the extern** (`AliasChain.landed`): a choice's class table, a map key's
   form, an identifier element. Asked of the `Extern` body, each answers as for no type.
 
-**Writing through an extern** (`writer.ExternTags`, from `TsonObjectWriter.describing(linked, root)`)
+**Writing through an extern** (`writer.ExternTags`, from `TsonObjectWriter.describing(compiled, root)`)
 
 - **Only a tag is the enclosing scope's**; the body is written as the class writes it, the foreign schema's names. A
   union member at a boundary is tagged with the enclosing scope's name for the entry its class is bound to: the
   extern for the target, an admitted name for a subtype or a variant. A class bound to no admitted entry is a
   `WriteException`, never the foreign name, which the boundary would refuse.
-- **A class maps to its entry by asking the binder forward**, for each admitted entry, by declaring schema and name:
-  the write inverts what a read binds.
+- **A class maps to its entry by asking forward**, for each admitted entry, what the binding of the scope holding
+  the boundary answers: the compiled schema's own, or a foreign compiled schema's, each the one its read binds by.
+  The write inverts what a read binds, and a writer's context must be the bindings' (`describing` refuses another).
+- **The foreign compiled schemas are held, not re-derived**: a compiled schema keeps the ones its externs obtained, by
+  identity. Every foreign compile in a registry uses the importer's bind context, so sharing them is sound.
 
 **Decisions that lost**
 
@@ -85,6 +88,8 @@ and a value read, bound and written through it in both encodings.
 - **Handing the boundary's annotations to the foreign reader through the context**: bytes on every context copy.
 - **Tags derived from `describing(uri, root)`**: a fetch, or a failure, at derivation for a schema never loaded.
 - **Compiling the foreign schema inside the importer's compile**: once per importer and per checkpoint.
+- **Loading a binding per scope when a writer is derived**: a second load beside the one each read binds by, which
+  could disagree with it.
 - **A `scope` component on `Diagnostic`**: `schemaId` already names the schema whose names were read.
 - **A target on the model record** (`@Unbound Optional<Target>` on `Extern`): a link fact on a body, which
   `schema.meta`'s equality and the binder's component analysis then meet. Link facts live on `TsonLinkedSchema`.

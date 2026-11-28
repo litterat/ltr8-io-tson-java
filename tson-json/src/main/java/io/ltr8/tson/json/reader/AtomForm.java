@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.numeric.DecimalType;
@@ -66,6 +67,14 @@ enum AtomForm {
             default -> throw new IllegalStateException(
                     "an atom form was asked of a non-atom body: " + body.getClass().getSimpleName());
         };
+    }
+
+    /**
+     * {@link #of(Top)} for a body read by {@code parser}: an enum whose members stand for a {@code Boolean}, as {@code
+     * boolean}'s do ({@code AtomParsers.forEntry}), is written as a JSON boolean.
+     */
+    static AtomForm of(Top body, AtomType<?> parser) {
+        return body instanceof EnumBody && parser.boundTo(Boolean.class).isPresent() ? BOOLEAN : of(body);
     }
 
     /**

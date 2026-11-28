@@ -9,7 +9,9 @@ history lives in git.
 - `tson-compiler` depends on `tson-schema`, not the reverse; `schema.meta` names no `tson-compiler` type.
 - `tson-tree`, `ltr8-regex` and `ltr8-unicode` are leaves, `ltr8-net` depends only on `ltr8-unicode`, and
   `tson-base` depends only on `ltr8-bind`, `ltr8-net` and `ltr8-unicode`; `tson-json` has no dependency on
-  `tson-compiler`.
+  `tson-compiler`, and `tson-encoding` names no type of either stack.
+- Both stacks take which class a schema entry binds to from `TsonSchemaBinding`; neither asks the bind context for an
+  entry itself, so a read's answer and the public view's cannot differ.
 - `Tson`/`Json` prefix only what a consumer names; unexported packages hold bare names.
 - No `opens` directives; an unexported package is genuinely unreachable.
 - A resolver never names a facade (`TsonObjectWriter`) — only the engine beneath it.
@@ -91,6 +93,19 @@ module has a real `module-info.java`; module names mirror each module's root exp
   and what needs the lexical form — §4 base type resolution, whose §4.4 rule is that a quoted token is a string, and
   `Token`, which records the spelling §8's resolved form carries — stays in `tson-compiler` with `TokenValue` and
   `BaseTypeResolver`, JSON having no token forms.
+- **`tson-encoding`** — `io.ltr8.tson.encoding`: `TsonSchemaBinding`, which host class each entry of a linked
+  schema binds to under one `DataBindContext`, loaded once when a schema compiles for bind mode and handed back by
+  the compiled schema of either encoding; and `io.ltr8.tson.encoding.plan`, exported only to `tson-compiler` and
+  `tson-json`, holding what their compiles share and a consumer must not reach -- the lenient bindings a
+  resolution's checkpoint loads. A qualified export is how two modules share an implementation no consumer sees; an
+  unexported package would be unreachable from both. `requires transitive` `tson-schema` and `ltr8-bind`, and is
+  required by `tson-compiler` and `tson-json`, which already required both. **Its own module because neither stack
+  can hold it for the other**: `tson-json` does not depend on `tson-compiler`, so the join in either stack is that
+  stack's alone, which is how the two encodings came to bind the same schema differently. It cannot go lower: it
+  names `ltr8-bind`'s descriptors, which `tson-schema` must not. Not `tson-atom` either, which is the atom
+  vocabulary and would become a miscellany. **Which entry a name is asked as stays in `tson-schema`**
+  (`TsonLinkedSchema.bindingCandidates`, `entryKey`), being a fact of the linked schema that a writer or a tree read
+  needs without binding anything.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `ltr8-annotation` — the nodes aren't bind targets, they're
@@ -145,15 +160,15 @@ module has a real `module-info.java`; module names mirror each module's root exp
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
 - **`tson`** — the front door, and **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
-  OkHttp. Declares `tson-compiler`/`tson-schema`/`ltr8-bind`/`tson-tree` as `api` so a caller sees the real
-  classes underneath. **`ProcessorConfig` is not here** — a configuration is a value stating what a deployment
+  OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-encoding`/`ltr8-bind`/`tson-tree` as `api` so a caller sees
+  the real classes underneath. **`ProcessorConfig` is not here** — a configuration is a value stating what a deployment
   chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
   follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and
   `Tson.standard()` for the unconfigured case.
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree (aligned with JEP 540's
   value model and nothing else of it), readers, writers and schema-directed reader stack, with no dependency on
-  `tson-compiler`. Parity with the TSON stack is guarded by `CrossEncodingParityTest` rather than by shared code.
-  `design/json-encoding.md` has the design.
+  `tson-compiler`. Parity with the TSON stack is guarded by `CrossEncodingParityTest`, and which class an entry binds
+  to is shared code (`tson-encoding`). `design/json-encoding.md` has the design.
 - **`tson-cli`** — the `tson` command-line application. Depends on nothing depending on it (exports
   nothing).
 

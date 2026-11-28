@@ -148,6 +148,18 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
+     * The identity of the entry {@code writtenName} denotes past its alias hops and its extern ({@link #landing}), in
+     * the schema declaring it; empty where its chain reaches no entry -- a namespace a resolution is still building.
+     */
+    public Optional<EntryKey> entryKey(String writtenName) {
+        Optional<ExternTarget.Landing> landing = landing(writtenName);
+        TsonLinkedSchema holder = landing.map(ExternTarget.Landing::in).orElse(this);
+        String entry = holder.terminal(landing.map(ExternTarget.Landing::name).orElse(writtenName));
+        return holder.schema.entries().containsKey(entry)
+                ? Optional.of(new EntryKey(holder.declaringIdentity(entry), entry)) : Optional.empty();
+    }
+
+    /**
      * The entries a binder is asked for, in order, for a value of the type {@code name} denotes: the entry at the end of
      * its alias hops and its extern ({@link #landing}), asked in the namespace holding it.
      *

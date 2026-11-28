@@ -1,12 +1,11 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.encoding.TsonTypeBinding;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.bind.UnboundNameException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -15,11 +14,9 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Top;
@@ -44,18 +41,18 @@ import java.util.List;
 final class BindRecordBuilder implements RecordBuilder {
 
     /**
-     * Bind mode's concrete record reader over {@code binding}: the bound class resolved from the schema type's
-     * names, each atom field's reader bound to what its component holds, and each schema-stated value made the
-     * component's own class. A record with no subtypes bound to a union is a labelled choice
-     * ({@link BindGroupUnionBuilder}). {@link DispatchFactories} decides whether a record position gets this or a
+     * Bind mode's concrete record reader: the bound class the compile's binding answers for the schema type, each
+     * atom field's reader bound to what its component holds, and each schema-stated value made the component's own
+     * class. A record with no subtypes bound to a union is a labelled choice ({@link BindGroupUnionBuilder}), whose
+     * members {@code binding} describes. {@link DispatchFactories} decides whether a record position gets this or a
      * dispatcher in front of it.
      */
     static ValueReaderFactory factory(DataBindContext binding) {
         return (name, definition, context) -> {
-            DataClass boundClass = boundClass(name, context, binding);
+            DataClass boundClass = boundClass(name, context);
             if (boundClass instanceof DataClassUnion union) {
                 if (!context.subtypesOf(name, definition).isEmpty()) {
-                    return ownDataOfUnion(name, definition, context, binding, union);
+                    return ownDataOfUnion(name, definition, context, union);
                 }
                 return BindGroupUnionBuilder.reader(name, definition, context, binding, union);
             }
@@ -202,12 +199,11 @@ final class BindRecordBuilder implements RecordBuilder {
      * tag the dispatcher follows always lands on a class the position can hold. A subtype with no bound class is
      * left to the read that reaches it, which defers it on the usual terms.
      */
-    private static JsonTypeReader<?> ownDataOfUnion(String name, Top definition,
-                                                    ValueReaderContext context, DataBindContext binding,
+    private static JsonTypeReader<?> ownDataOfUnion(String name, Top definition, ValueReaderContext context,
                                                     DataClassUnion union) {
         List<String> outside = new ArrayList<>();
         for (String subtype : context.subtypesOf(name, definition)) {
-            DataClass member = boundClassOrNull(subtype, context, binding);
+            DataClass member = context.bindingOf(subtype).map(TsonTypeBinding::dataClass).orElse(null);
             if (member != null && !union.isMemberType(member.typeClass())) {
                 outside.add("subtype '" + subtype + "' binds " + member.typeClass().getName()
                         + ", which is not a member");
@@ -254,39 +250,11 @@ final class BindRecordBuilder implements RecordBuilder {
     }
 
     /**
-     * The class bound to entry {@code name}, tried under its binding candidates in order ({@link
-     * io.ltr8.tson.schema.TsonLinkedSchema#bindingCandidates}). No class at all is deferred rather than fatal -- a
-     * schema declares types a given consumer never binds -- so it reaches the first read of this type.
+     * The class bound to entry {@code name}, as the compile's binding answers it. No class at all is deferred rather
+     * than fatal -- a schema declares types a given consumer never binds -- so it reaches the first read of this type.
      */
-    private static DataClass boundClass(String name, ValueReaderContext context, DataBindContext binding) {
-        DataBindException first = null;
-        List<EntryKey> candidates = context.linked().bindingCandidates(name);
-        for (EntryKey candidate : candidates) {
-            try {
-                return binding.getDescriptor(candidate.declaringSchema(), candidate.name());
-            } catch (UnboundNameException e) {
-                first = first == null ? e : first;
-            } catch (DataBindException e) {
-                // Bound, to a class this context cannot analyse: deferred like a type nobody bound, named for what it is.
-                throw new MissingBindingException(e.getMessage(), e);
-            }
-        }
-        throw new MissingBindingException("no bound Java class for '"
-                + String.join("' or '", candidates.stream().map(EntryKey::name).toList())
-                + "': nothing in this bind context resolves that schema type name"
-                + (first == null ? "" : " -- " + first.getMessage()), first);
-    }
-
-    /** {@link #boundClass}, or null where nothing is bound -- for a question a missing binding does not answer. */
-    private static DataClass boundClassOrNull(String name, ValueReaderContext context, DataBindContext binding) {
-        for (EntryKey candidate : context.linked().bindingCandidates(name)) {
-            try {
-                return binding.getDescriptor(candidate.declaringSchema(), candidate.name());
-            } catch (DataBindException ignored) {
-                // not bound under this name; the next is tried
-            }
-        }
-        return null;
+    static DataClass boundClass(String name, ValueReaderContext context) {
+        return context.bound(name).dataClass();
     }
 
     /**

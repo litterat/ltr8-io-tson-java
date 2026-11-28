@@ -198,12 +198,17 @@ sends them. A FIXED field is exempt, the schema settling its value. The same com
 - `@Unbound` on a component marks it as the class's own — a source position kept for diagnostics, a
   cache, anything derived — so binding leaves it alone instead of reporting a mismatch. Without it, a
   component no schema field fills reaches the constructor as `null` however careful the class is.
-- `MissingBindingException` (a subclass) covers a schema type with no class this context can **build** —
-  none is mapped to its name, or the class that is cannot be analysed (an interface that is no union, a
-  collection with no constructor to build it) — and is deferred to the first read of that type, since a schema
-  legitimately declares types a consumer never binds. Beneath it, `DataBindContext.getDescriptor(String)` raises
-  `UnboundNameException` for a name the binder maps to no class, and a plain `DataBindException` for a class it
-  cannot analyse.
+- A class the binder maps and the context cannot analyse (an interface that is no union, a raw `Map`, a record
+  holding a `java.net.URL`) fails the bind compile as `BindMismatchException`, naming the entry, the class and why:
+  every read of that type would fail. A parametric record's class is never analysed, only its applications'.
+- `MissingBindingException` (a subclass) covers a schema type no class is mapped to, and is deferred to the first
+  read of that type, since a schema legitimately declares types a consumer never binds. Beneath it,
+  `DataBindContext.getDescriptor(String)` raises `UnboundNameException` for a name the binder maps to no class, and
+  a plain `DataBindException` for a class it cannot analyse.
+- To know before any read which class each type binds to — a startup check that every request type binds — take
+  the compiled schema's `binding()` (`TsonSchemaBinding`): `get(name)` is the `TsonTypeBinding` or empty,
+  `require(key)` says why nothing binds it, and `get(Class)` is the entry a class is bound as. It is the answer
+  the readers were built from, so it cannot disagree with a read.
 
 **A bound class refusing a value is a diagnostic, not an exception.** A constructor's own check, a bridge, or a
 collection's `put` throwing for what a read hands it — a compact constructor rejecting a value, a

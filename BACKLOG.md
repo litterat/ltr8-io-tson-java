@@ -309,7 +309,7 @@ encodings ([TSON-JSON] §6.1.1).
   drops every tag, so `JsonTreeWriter` writes the value back untagged. A value at an abstract position, a
   non-disjoint choice, a declared position, or a boundary naming a subtype or a variant ([TSON-JSON] §8.6) therefore
   writes JSON that does not read back. The work is a schema-directed JSON object writer, the peer of
-  `TsonObjectWriter.describing(linked, root)`, writing each `$type` in the scope it is read in, the boundary's by
+  `TsonObjectWriter.describing(compiled, root)`, writing each `$type` in the scope it is read in, the boundary's by
   the enclosing scope's name (`tson-schema`'s `ExternAdmission` says which), and one per value, a subtype by its
   own name and never inside a wrapper's `$value` ([TSON-JSON] §3.3).
 - [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 41.** §3.3 requires `$type` (after any `$import`)
@@ -420,12 +420,10 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
 
 ## Module structure
 
-- [ ] **The encoding-neutral reader parts move into a module both stacks share — `tson-encoding` or similar, not
-  `tson-base`.** With two working stacks the seam is visible (`design/json-encoding.md` deferred this until there
-  were two to find it from): everything above the event level is encoding-neutral, and today it exists twice,
-  guarded by `CrossEncodingParityTest` rather than by being one thing. `tson-base` is the wrong home — it is already
-  the shared bottom of everything and is at risk of becoming a miscellany — so this is a module of its own, below
-  `tson-json` and the TSON reader and above `tson-schema`, `tson-atom` and `ltr8-bind`. The JSON shape (a plan, one
+- [ ] **The encoding-neutral reader parts move into `tson-encoding`, in a package exported to the two stacks
+  only** (`io.ltr8.tson.encoding.plan`, `exports … to io.ltr8.tson.compiler, io.ltr8.tson.json`). Which class an
+  entry binds to is there already (`TsonSchemaBinding`); everything else above the event level is encoding-neutral
+  and exists twice, guarded by `CrossEncodingParityTest` rather than by being one thing. The JSON shape (a plan, one
   loop per encoding, a builder per mode) is what shares; `tson-compiler`'s base class with hooks shares only by
   making both stacks extend it. In order of value:
   - **The bind plan** — field-to-component matching, the FIXED exemption, `@Unbound`, the atom checks and

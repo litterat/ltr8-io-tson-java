@@ -117,6 +117,27 @@ class BindingCandidatesTest {
     }
 
     @Test
+    void anEntryKeyIsTheEntryAtTheEndOfTheChainInItsDeclaringSchema() {
+        Map<String, Top> foreignEntries = new LinkedHashMap<>();
+        foreignEntries.put("x", new VoidType());
+        TsonLinkedSchema foreign = new TsonLinkedSchema(new TsonSchema("https://example.test/foreign.tn", List.of(),
+                AnnotatedMap.of(foreignEntries), false, Map.of(), Map.of()));
+        Map<String, Top> entries = new LinkedHashMap<>(chain());
+        entries.put("y", new Extern("https://example.test/foreign.tn", "x"));
+        entries.put("z", aliasOf("y"));
+        entries.put("lost", aliasOf("nowhere"));
+        TsonLinkedSchema linked = new TsonLinkedSchema(new TsonSchema(ID, List.of(), AnnotatedMap.of(entries), false,
+                Map.of(), Map.of()), Map.of("u", "example.test/lib.tn"), Map.of(), Map.of(),
+                Map.of("y", new ExternTarget(foreign, "x")));
+
+        assertEquals(Optional.of(new EntryKey(IDENTITY, "t")), linked.entryKey("far"));
+        assertEquals(Optional.of(new EntryKey("example.test/lib.tn", "u")), linked.entryKey("u"));
+        assertEquals(Optional.of(new EntryKey("example.test/foreign.tn", "x")), linked.entryKey("z"));
+        assertEquals(Optional.empty(), linked.entryKey("lost"));
+        assertEquals(Optional.empty(), linked.entryKey("[text]"));
+    }
+
+    @Test
     void theTerminalIsTheEntryAtTheEndOfTheAliasHops() {
         TsonLinkedSchema linked = linked(chain(), List.of());
 

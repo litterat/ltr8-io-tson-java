@@ -51,7 +51,8 @@ and of `WaitOrder` and `SchemaResolver.Vocabulary`, carries the mechanism.
 - **Readers outlive the checkpoint they were compiled at**, because every fact they take from the closure is reached
   by a name or a pin at which a read stops; they are dropped once every entry is ready (`WaitOrder.settled`), when
   materialisation starts rewriting entries in place. A checkpoint's compile defers what may depend on what it lacks:
-  a bind mismatch is the read's that reaches the entry. The restart state is `WaitOrder`'s, one per `resolveSchema`
+  a bind mismatch is the read's that reaches the entry, and so is a class its context cannot describe, the
+  consumer's class failing no resolution. The restart state is `WaitOrder`'s, one per `resolveSchema`
   call; nothing is cached in the loader.
 - **Only a resolution in progress links with references pending or compiles with entries pending**
   (`TsonSchemaLinker.linkReady`, `TsonSchemaCompiler.compileReady`). The partial link reports nothing, each entry

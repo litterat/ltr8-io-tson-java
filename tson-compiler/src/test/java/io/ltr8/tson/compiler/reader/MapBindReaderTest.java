@@ -52,9 +52,9 @@ class MapBindReaderTest {
         return (Catalogue) read(Catalogue.class, "catalogue", document);
     }
 
-    /** {@code document} read as {@code entry}, which is bound to {@code type}. */
+    /** {@code document} read as {@code entry}, which is bound to {@code type}, or to nothing where it is null. */
     private static Object read(Class<?> type, String entry, String document) {
-        DataNameBinder binder = schemaTypeName -> entry.equals(schemaTypeName)
+        DataNameBinder binder = schemaTypeName -> type != null && entry.equals(schemaTypeName)
                 ? type
                 : SchemaModelNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
@@ -123,11 +123,24 @@ class MapBindReaderTest {
         assertEquals(List.of("b", "a"), List.copyOf(catalogue.entries().keySet()));
     }
 
-    /** Read directly, with no component to declare a class, an ordered map is built as one that keeps its order. */
+    /**
+     * Read directly, with no component to declare a class, an ordered map is built as one that keeps its order. Nothing
+     * binds the entry: a raw {@code Map} says nothing of its keys and values, and is refused like any class the bind
+     * context cannot describe.
+     */
     @Test
     void anOrderedMapReadDirectlyKeepsItsOrder() {
-        Object table = read(Map.class, "ranked", "{ zeta => 1  alpha => 2  mid => 3 }");
+        Object table = read(null, "ranked", "{ zeta => 1  alpha => 2  mid => 3 }");
         assertInstanceOf(LinkedHashMap.class, table);
         assertEquals(List.of("zeta", "alpha", "mid"), List.copyOf(((Map<?, ?>) table).keySet()));
+    }
+
+    @Test
+    void aMapEntryBoundToARawMapFailsTheCompile() {
+        BindMismatchException e = assertThrows(BindMismatchException.class,
+                () -> read(Map.class, "ranked", "{ zeta => 1 }"));
+        assertEquals("'ranked' of example.test/catalogue.tn binds java.util.Map, which cannot be analysed: Map must "
+                + "provide parameterized type information. Bind 'ranked' to a class this bind context can describe, or "
+                + "leave it out of the binding map", e.getMessage());
     }
 }

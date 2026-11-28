@@ -5,11 +5,13 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonCompiledVocabularyRegistry;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -65,7 +67,7 @@ class ExternTagsTest {
         DataBindContext context = DataBindContext.builder()
                 .nameBinder(DataNameBinder.ofMap(Map.of("ships", H.class, "x", X.class))).build();
 
-        ExternTags.Boundary boundary = ExternTags.of(linked, context).at(H.class, "v");
+        ExternTags.Boundary boundary = ExternTags.of(List.of(TsonSchemaBinding.load(linked, context))).at(H.class, "v");
 
         assertNotNull(boundary);
         assertEquals("y", boundary.tagFor(X.class));

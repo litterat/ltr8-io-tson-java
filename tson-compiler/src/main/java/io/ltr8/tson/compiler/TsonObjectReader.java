@@ -7,7 +7,6 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.reader.DataClassObjectReader;
@@ -16,7 +15,6 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.Namespace;
 
 import java.io.InputStream;
@@ -724,7 +722,7 @@ public final class TsonObjectReader {
         // why the reader itself cannot know this.
         ctx = root.rootDeclaration().map(ctx::underDeclaration).orElse(ctx);
         TsonTypeReader<?> reader = root.reader();
-        Class<?> bound = boundClass(root.candidates());
+        Class<?> bound = root.bound();
         if (type == Namespace.class && root.namespace() != null) {
             // A namespace type reads as its map; asked for the value itself, the map is an instance of the
             // constructor the root names.
@@ -776,22 +774,6 @@ public final class TsonObjectReader {
         return null;
     }
 
-    /**
-     * The bound Java class the root type maps to under the first of its {@code candidates} that binds, as its reader
-     * binds it, or {@code null} if none does (e.g. an atom root) -- the before-read type check then falls back to the
-     * post-read cast.
-     */
-    private Class<?> boundClass(List<EntryKey> candidates) {
-        for (EntryKey candidate : candidates) {
-            try {
-                return dataBindContext.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
-            } catch (DataBindException e) {
-                // not bound under this name; the next is tried
-            }
-        }
-        return null;
-    }
-
     /** The schema's root reader, or {@code null} when the problem has been reported and the value skipped. */
     private RootReader select(List<String> schemaUris, TsonReadContext ctx, String typeName) {
         TsonCompiledSchema compiled;
@@ -833,15 +815,16 @@ public final class TsonObjectReader {
         }
         String terminal = compiled.linkedSchema().terminal(name);
         String namespace = compiled.linkedSchema().namespace(terminal).isPresent() ? terminal : null;
-        return new RootReader(reader, name, compiled.rootDeclaration(name), namespace,
-                compiled.linkedSchema().bindingCandidates(name));
+        // The class the root's reader binds, as the compile's binding answers it; null where none is (an atom root),
+        // and the before-read type check falls to the post-read cast.
+        String root = name;
+        Class<?> bound = compiled.binding().flatMap(binding -> binding.get(root))
+                .<Class<?>>map(binding -> binding.dataClass().typeClass()).orElse(null);
+        return new RootReader(reader, name, compiled.rootDeclaration(name), namespace, bound);
     }
 
-    /**
-     * {@code namespace} is the namespace type the root type is, {@code null} where it is none; {@code candidates} the
-     * entries its class is asked under ({@link io.ltr8.tson.schema.TsonLinkedSchema#bindingCandidates}).
-     */
+    /** {@code namespace} is the namespace type the root type is, {@code null} where it is none, as {@code bound}. */
     private record RootReader(TsonTypeReader<?> reader, String typeName,
-                               Optional<SchemaLocation> rootDeclaration, String namespace, List<EntryKey> candidates) {
+                               Optional<SchemaLocation> rootDeclaration, String namespace, Class<?> bound) {
     }
 }

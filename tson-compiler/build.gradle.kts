@@ -11,6 +11,10 @@ dependencies {
     // module of its own rather than a package here because [TSON-JSON] §5.1 makes it the type system's
     // rather than this encoding's, so tson-json reads the same families without depending on this engine.
     implementation(project(":tson-atom"))
+    // Which host class each schema entry binds to, loaded once per bind compile: the answer this engine's bind
+    // readers are built from, shared with tson-json so the two encodings bind by one implementation. Public
+    // signatures return it (TsonCompiledSchema.binding), so it is `requires transitive` in module-info.
+    implementation(project(":tson-encoding"))
     implementation(project(":ltr8-annotation"))
     // The immutable TsonValue tree model, a pure leaf module. tson-compiler holds the engine that produces
     // and consumes it (TsonTreeReader/TsonTreeWriter, the reader.*TreeReader family) -- the same direction
