@@ -19,6 +19,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Tuple;
+import io.ltr8.annotation.Union;
 
 /** Classes whose marks say two kinds, or a mark the kind they are given never reads. */
 public final class KindConflicts {
@@ -75,5 +76,33 @@ public final class KindConflicts {
 	@Tuple
 	@Record
 	public record TupleRecord(String value) {
+	}
+
+	// --- a record nothing can build
+
+	@Record
+	public abstract static class AbstractRecord {
+	}
+
+	public abstract static class AbstractRecordConstructor {
+		@Record
+		public AbstractRecordConstructor(String value) {
+		}
+	}
+
+	@Record
+	@Union
+	public abstract static class AbstractRecordUnion {
+	}
+
+	@Record
+	public abstract static sealed class SealedAbstractRecord permits SealedAbstractRecordMember {
+	}
+
+	public static final class SealedAbstractRecordMember extends SealedAbstractRecord {
+	}
+
+	@Record
+	public interface RecordInterface {
 	}
 }

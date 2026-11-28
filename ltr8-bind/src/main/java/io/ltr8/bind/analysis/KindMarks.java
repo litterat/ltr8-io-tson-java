@@ -63,10 +63,10 @@ final class KindMarks {
 	}
 
 	/**
-	 * What a kind reads: the {@link #MARKS} it consumes, the JDK facts it needs, and its walks. A kind running
-	 * {@link Walk#ATOM} judges the {@code @Atom} marks there.
+	 * What a kind reads: the {@link #MARKS} it consumes, the JDK facts it needs and those it cannot describe, and its
+	 * walks. A kind running {@link Walk#ATOM} judges the {@code @Atom} marks there.
 	 */
-	private record Reading(Set<Signal> marks, Set<Signal> needs, List<Walk> walks) {
+	private record Reading(Set<Signal> marks, Set<Signal> needs, Set<Signal> excludes, List<Walk> walks) {
 	}
 
 	/** The signals an author writes on a class, rather than facts the JDK reports of it. */
@@ -89,7 +89,8 @@ final class KindMarks {
 				Walk.ANY));
 		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.TO_DATA,
 				Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
-		RESOLVED.put(Kind.RECORD, reading(all, Set.of(), Walk.INHERITED_WAY_IN));
+		RESOLVED.put(Kind.RECORD, reading(all, Set.of(), Set.of(Signal.INTERFACE, Signal.ABSTRACT),
+				Walk.INHERITED_WAY_IN));
 		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM,
 				Walk.BRIDGED_RECORD));
 		RESOLVED.put(Kind.ENUM, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
@@ -111,7 +112,11 @@ final class KindMarks {
 	}
 
 	private static Reading reading(Set<Signal> marks, Set<Signal> needs, Walk... walks) {
-		return new Reading(Set.copyOf(marks), needs, List.of(walks));
+		return reading(marks, needs, Set.of(), walks);
+	}
+
+	private static Reading reading(Set<Signal> marks, Set<Signal> needs, Set<Signal> excludes, Walk... walks) {
+		return new Reading(Set.copyOf(marks), needs, excludes, List.of(walks));
 	}
 
 	private static Set<Signal> but(Set<Signal> marks, Signal... unread) {
@@ -139,6 +144,11 @@ final class KindMarks {
 		for (Signal need : reading.needs()) {
 			if (!signals.has(need)) {
 				throw unmet(kind, signals);
+			}
+		}
+		for (Signal excluded : reading.excludes()) {
+			if (signals.has(excluded)) {
+				throw excluded(kind, signals);
 			}
 		}
 		Class<?> bridgedTo = kind == Kind.BRIDGED ? ToDataBridges.findToDataClass(signals.type()) : null;
@@ -208,6 +218,27 @@ final class KindMarks {
 			case TUPLE -> new CodeAnalysisException("@Tuple can only be applied to a genuine Java record: " + type);
 			default -> throw new IllegalStateException(kind + " needs no fact " + type.getName() + " lacks");
 		};
+	}
+
+	private static DataBindException excluded(Kind kind, ClassSignals signals) {
+		Class<?> type = signals.type();
+		if (kind != Kind.RECORD) {
+			throw new IllegalStateException(kind + " excludes no fact " + type.getName() + " has");
+		}
+		String record = label(ownWay(kind, signals), type);
+		String noun = signals.has(Signal.INTERFACE) ? "interface" : "abstract class";
+		String built = "which describes a class built through its constructor: ";
+		if (signals.has(Signal.SEALED)) {
+			return new CodeAnalysisException(String.format("%s is a sealed %s, a union of the classes it permits, but "
+					+ "carries %s, %sremove it", type.getName(), noun, record, built));
+		}
+		if (signals.has(Signal.UNION)) {
+			return new CodeAnalysisException(String.format("%s is an %s carrying @Union, a union of its members, but "
+					+ "carries %s, %sremove it", type.getName(), noun, record, built));
+		}
+		return new CodeAnalysisException(String.format("%s is an %s, which nothing can build, but carries %s, %s%s",
+				type.getName(), noun, record, built, signals.has(Signal.INTERFACE) ? "remove it"
+						: "make " + type.getSimpleName() + " concrete, or remove it"));
 	}
 
 	private static DataBindException unread(Kind kind, ClassSignals signals, Signal mark, String written,

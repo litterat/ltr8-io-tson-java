@@ -16,6 +16,11 @@
 package io.ltr8.test.bind;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.test.data.KindConflicts.AbstractRecord;
+import io.ltr8.test.data.KindConflicts.AbstractRecordConstructor;
+import io.ltr8.test.data.KindConflicts.AbstractRecordUnion;
+import io.ltr8.test.data.KindConflicts.RecordInterface;
+import io.ltr8.test.data.KindConflicts.SealedAbstractRecord;
 import io.ltr8.test.data.KindConflicts.TransparentRecord;
 import io.ltr8.test.data.KindConflicts.TransparentRecordConstructor;
 import io.ltr8.test.data.KindConflicts.TransparentToData;
@@ -51,6 +56,23 @@ class KindConflictRefusalTest {
 						+ "ToData, as the record class it names: remove one of them"),
 				described(TupleRecord.class, "says two ways to write it, @Tuple, as its components by position, and "
 						+ "@Record, as its components by name: remove one of them"));
+	}
+
+	@Test
+	void aRecordNothingCanBuildIsRefused() {
+		String built = "which describes a class built through its constructor: ";
+		assertAll(
+				described(AbstractRecord.class, "is an abstract class, which nothing can build, but carries @Record, "
+						+ built + "make AbstractRecord concrete, or remove it"),
+				described(AbstractRecordConstructor.class, "is an abstract class, which nothing can build, but carries "
+						+ "@Record on the constructor AbstractRecordConstructor(String), " + built
+						+ "make AbstractRecordConstructor concrete, or remove it"),
+				described(AbstractRecordUnion.class, "is an abstract class carrying @Union, a union of its members, but "
+						+ "carries @Record, " + built + "remove it"),
+				described(SealedAbstractRecord.class, "is a sealed abstract class, a union of the classes it permits, "
+						+ "but carries @Record, " + built + "remove it"),
+				described(RecordInterface.class, "is an interface, which nothing can build, but carries @Record, "
+						+ built + "remove it"));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */
