@@ -231,10 +231,10 @@ only onto a record descriptor (`requireRecord`), so without this reader a sealed
   component name otherwise). A member of a labelled choice carries exactly the field it is the label for, so
   the component *is* the field; matching on anything else would need a second table to keep in step with the
   first.
-- **Three conditions are checked, not assumed** — union target, one non-optional group covering every field, and
-  every member carrying one component named for one of those fields. A near-miss falls through to the
-  ordinary record path and is reported there; guessing at a partial match would bind a member to a field it
-  does not carry.
+- **Every condition is checked, not assumed** — one non-optional group of one-field options covering every field,
+  and every member carrying one component named for one of those fields. A union bound to a record with no subtypes
+  is a labelled choice or a `BindMismatchException` naming what did not line up; guessing at a partial match would
+  bind a member to a field it does not carry.
 - **The group rule is the whole contract**, so `validateGroups` is what guarantees exactly one member arrived
   — an empty record and a two-field one are both reported before anything is constructed.
 - **A member may want the raw token rather than the value it denotes**, and the choice has to be made *before*
