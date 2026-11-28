@@ -661,7 +661,7 @@ Also exports `io.ltr8.bind.mapper` and `io.ltr8.bind.bridge`. See `references/bi
 ## `io.ltr8.annotation` (module `ltr8-annotation`)
 
 `@Typename`, `@Field`, `@Record`, `@Tuple`, `@Union`, `@Atom`, `@Transparent`, `@Profile`, `@Unbound`,
-`@FieldOrder`, `@Namespace`, plus `Annotations` / `Annotation` (the wire-annotation carrier),
+`@FieldOrder`, plus `Annotations` / `Annotation` (the wire-annotation carrier),
 `Annotated` / `AnnotatedMap`, and the `DataBridge` / `ToData` conversion interfaces. See `references/bindings.md`.
 
 ---

@@ -17,6 +17,8 @@ package io.ltr8.bind;
 
 import java.util.Objects;
 import java.util.Optional;
+
+import io.ltr8.annotation.Typename;
 import io.ltr8.bind.internal.Memoized;
 
 /**
@@ -32,6 +34,8 @@ public abstract class DataClass {
 	private final Class<?> typeClass;
 
 	private final Optional<DataClassBridge> bridge;
+
+	private final Optional<String> typeName;
 
 	/**
 	 * A held component descriptor's class name for a {@code toString}, without resolving one that is still
@@ -50,6 +54,8 @@ public abstract class DataClass {
 	public DataClass( Class<?> targetType, DataClassBridge bridge) {
 		this.typeClass = Objects.requireNonNull(targetType);
 		this.bridge = Optional.ofNullable(bridge);
+		// Read here rather than by each binder, so no kind of descriptor, nor one built outside analysis, lacks it.
+		this.typeName = Optional.ofNullable(targetType.getAnnotation(Typename.class)).map(Typename::name);
 	}
 
 	public DataClass( Class<?> targetType) {
@@ -61,6 +67,22 @@ public abstract class DataClass {
 	 */
 	public Class<?> typeClass() {
 		return typeClass;
+	}
+
+	/**
+	 * The {@link Typename} the described class carries itself, empty where it carries none. No name stands in for a
+	 * missing one: a convention such as the simple class name is the caller's.
+	 */
+	public Optional<String> typeName() {
+		return typeName;
+	}
+
+	/**
+	 * Whether this describes a {@code @Transparent} class: its one component's shape, wearing the class and a bridge
+	 * to that component, which otherwise reads as any other bridged class.
+	 */
+	public boolean isTransparent() {
+		return bridge.isPresent() && bridge.get().isTransparent();
 	}
 
 	public Optional<DataClassBridge> bridge() {

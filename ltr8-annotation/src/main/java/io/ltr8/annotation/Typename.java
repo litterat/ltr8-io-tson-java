@@ -20,11 +20,15 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * The type name the annotated class declares for itself, exposed by {@code ltr8-bind} as {@code DataClass.typeName()}
+ * on the class's own descriptor and not on a subclass's. Any text but a blank one, which refuses the class;
+ * {@code ltr8-bind} attaches no meaning to it, and what it may contain is for the encoding that reads it.
+ */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
+@Target(ElementType.TYPE)
 public @interface Typename {
 
-	// specify the model type.
 	String name();
 
 }
