@@ -21,7 +21,8 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
   one public instance method or `ToData<S>`, possibly inherited; nothing is found by name, and the halves carry one
   value up to boxing. A `ToData` class marking no `@Atom` is a bridged class (`AtomFormTest`). `@Atom` on a class
   described as anything else, or on a super class's static method, refuses the class (`UnreadAtomRefusalTest`), save
-  on a record, where only `registerAtom` reads it, and on an instance method a class described as an atom may inherit.
+  on an instance method a class described as an atom may inherit; on a record, described or registered bare, it is a
+  second way to write it, refused naming `registerAtom(Class, bridge)` as a record's atom form (`AtomFormTest`).
 - A binding annotation is never silently ignored: `@Field`, `@Union` or `@Unbound` is applied, or the class is
   refused (`IgnoredAnnotationRefusalTest`); a component's members merge `@Field` by attribute and must agree
   (`ComponentAnnotationPrecedenceTest`).

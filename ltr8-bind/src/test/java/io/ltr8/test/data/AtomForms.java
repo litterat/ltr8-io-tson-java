@@ -277,7 +277,7 @@ public final class AtomForms {
 	@Atom
 	public enum Marked { ONE, TWO }
 
-	// --- a record stays a record
+	// --- a record marking @Atom says two ways to be written
 
 	public record RecordWithAtomConstructor(String code) {
 
@@ -286,7 +286,6 @@ public final class AtomForms {
 		}
 	}
 
-	/** Described, a record; registered as an atom, a way out with no way in. */
 	public record RecordWithAtomAccessor(String code) {
 
 		@Atom

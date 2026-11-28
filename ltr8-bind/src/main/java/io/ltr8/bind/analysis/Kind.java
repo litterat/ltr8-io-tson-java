@@ -100,8 +100,8 @@ enum Kind {
 
 	/**
 	 * The kind {@code signals} decide for a class registered as an atom: {@link #ENUM}, {@link #ATOM} or
-	 * {@link #NONE}. Every signal of another kind is set aside, since registering a record or a union that marks
-	 * {@code @Atom} asks for the atom form it states.
+	 * {@link #NONE}. Every signal of another kind is set aside, since registering a union that marks {@code @Atom}
+	 * asks for the atom form it states; {@link KindMarks} refuses a record's, which is a bridge's to give.
 	 */
 	static Kind asAtom(Set<Signal> signals) {
 		Set<Signal> forms = EnumSet.noneOf(Signal.class);

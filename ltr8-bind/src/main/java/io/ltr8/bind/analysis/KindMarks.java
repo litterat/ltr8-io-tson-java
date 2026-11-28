@@ -15,6 +15,7 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindException;
@@ -24,8 +25,14 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -170,6 +177,7 @@ final class KindMarks {
 		if (signals.has(Signal.UNION) && !signals.has(Signal.ABSTRACT) && !signals.has(Signal.SEALED)) {
 			throw unread(entry, kind, signals, Signal.UNION, written, bridgedTo);
 		}
+		refuseRecordAtom(entry, kind, signals, written);
 		for (Signal mark : MARKS) {
 			if (signals.has(mark) && !reading.marks().contains(mark)
 					&& !(ATOM_SIGNALS.contains(mark) && reading.walks().contains(Walk.ATOM))) {
@@ -264,6 +272,52 @@ final class KindMarks {
 			case TUPLE -> new CodeAnalysisException("@Tuple can only be applied to a genuine Java record: " + type);
 			default -> throw new IllegalStateException(kind + " needs no fact " + type.getName() + " lacks");
 		};
+	}
+
+	/** The facts and marks that make a class a record of one kind or another, a JDK record or a marked class. */
+	private static final Set<Signal> RECORD_FAMILY = EnumSet.of(Signal.JDK_RECORD, Signal.RECORD_ON_TYPE,
+			Signal.RECORD_ON_CONSTRUCTOR, Signal.TUPLE, Signal.TRANSPARENT);
+
+	/**
+	 * Refuses a record that carries {@code @Atom} on itself, a constructor or a method of its own, which says it is an
+	 * atom too: a record is written one way, and its atom form, where it has one, is a registered bridge. Its kinds
+	 * read the {@code @Atom} marks, so that this names the fix; a record's inherited instance method is its super
+	 * class's to judge.
+	 */
+	private static void refuseRecordAtom(Entry entry, Kind kind, ClassSignals signals, String written)
+			throws DataBindException {
+		boolean judged = entry == Entry.RESOLVE
+				? kind == Kind.RECORD || kind == Kind.TUPLE || kind == Kind.TRANSPARENT
+				: kind == Kind.ATOM || kind == Kind.NONE;
+		if (!judged || Collections.disjoint(signals.present(), RECORD_FAMILY)) {
+			return;
+		}
+		Class<?> type = signals.type();
+		List<AnnotatedElement> marked = new ArrayList<>();
+		if (type.isAnnotationPresent(Atom.class)) {
+			marked.add(type);
+		}
+		Stream.of(type.getDeclaredConstructors()).filter(constructor -> constructor.isAnnotationPresent(Atom.class))
+				.forEach(marked::add);
+		Stream.of(type.getDeclaredMethods()).filter(method -> !method.isBridge() && !method.isSynthetic()
+				&& method.isAnnotationPresent(Atom.class)).sorted(Comparator.comparing(Method::toString))
+				.forEach(marked::add);
+		if (marked.isEmpty()) {
+			return;
+		}
+		String member = switch (marked.getFirst()) {
+			case Class<?> marks -> "the " + (marks.isInterface() ? "interface " : "class ") + marks.getSimpleName();
+			case Constructor<?> constructor -> "the constructor " + type.getSimpleName() + parameters(constructor);
+			case Method method -> "the method " + type.getSimpleName() + "." + method.getName() + parameters(method);
+			default -> throw new IllegalStateException(marked.getFirst() + " is no class, constructor or method");
+		};
+		String fix = "remove it; an atom form for a record comes from registerAtom(" + type.getSimpleName()
+				+ ".class, bridge)";
+		throw new CodeAnalysisException(entry == Entry.RESOLVE
+				? String.format("%s %s, but carries @Atom on %s, which says it is an atom: %s", type.getName(),
+						written, member, fix)
+				: String.format("%s is registered as an atom, but is a record, whose @Atom on %s nothing reads: %s",
+						type.getName(), member, fix));
 	}
 
 	private static DataBindException excluded(Kind kind, ClassSignals signals) {
@@ -385,10 +439,15 @@ final class KindMarks {
 		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
 			if (constructor.isAnnotationPresent(annotation)
 					&& Modifier.isPublic(constructor.getModifiers()) == isPublic) {
-				return "the constructor " + type.getSimpleName() + Stream.of(constructor.getParameterTypes())
-						.map(Class::getSimpleName).collect(Collectors.joining(", ", "(", ")"));
+				return "the constructor " + type.getSimpleName() + parameters(constructor);
 			}
 		}
 		throw new IllegalStateException(type.getName() + " marks no constructor " + annotation.getSimpleName());
+	}
+
+	/** As the source declares them, the parameters a compact canonical constructor's metadata marks mandated too. */
+	private static String parameters(Executable executable) {
+		return Stream.of(executable.getParameterTypes()).map(Class::getSimpleName)
+				.collect(Collectors.joining(", ", "(", ")"));
 	}
 }
