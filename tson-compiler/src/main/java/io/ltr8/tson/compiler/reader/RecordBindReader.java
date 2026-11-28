@@ -4,7 +4,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.*;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
@@ -16,7 +15,6 @@ import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.schema.meta.*;
 
-import java.lang.reflect.RecordComponent;
 import java.util.*;
 
 /**
@@ -125,23 +123,20 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }
         }
-        {
-            Set<String> unbound = unboundComponents(descriptor.typeClass());
-            for (DataClassField classField : descriptor.fields()) {
-                if (classField != annotationsCarrier && !boundByAField(classField)
-                        && !unbound.contains(classField.name())) {
-                    mismatches.add("component '" + classField.name() + "' is filled by no field, so it reaches "
-                            + "the constructor as null on every document -- annotate it @Unbound if the class "
-                            + "means to own it");
-                }
+        // fields() holds no @Unbound component, so every component here is one a field must fill.
+        for (DataClassField classField : descriptor.fields()) {
+            if (classField != annotationsCarrier && !boundByAField(classField)) {
+                mismatches.add("component '" + classField.name() + "' is filled by no field, so it reaches "
+                        + "the constructor as null on every document -- annotate it @Unbound if the class "
+                        + "means to own it");
             }
-            if (!mismatches.isEmpty()) {
-                throw new BindMismatchException("'" + displayName + "' and "
-                        + descriptor.typeClass().getName() + " do not agree: " + String.join("; ", mismatches)
-                        + ". Bind the class the schema describes -- a class that means to read one version of a "
-                        + "schema while another is current declares a @Profile constructor for it, which says "
-                        + "which fields it takes rather than dropping whatever it does not name");
-            }
+        }
+        if (!mismatches.isEmpty()) {
+            throw new BindMismatchException("'" + displayName + "' and "
+                    + descriptor.typeClass().getName() + " do not agree: " + String.join("; ", mismatches)
+                    + ". Bind the class the schema describes -- a class that means to read one version of a "
+                    + "schema while another is current declares a @Profile constructor for it, which says "
+                    + "which fields it takes rather than dropping whatever it does not name");
         }
         // After the rebinding above, so each default and pin is decoded through the reader its field binds with.
         CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
@@ -155,36 +150,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
         }
         return false;
-    }
-
-    /**
-     * The components a class marked as its own ({@code @Unbound}), under the same names {@link
-     * DataClassField#name()} uses -- so an {@code @Field}-renamed component is recognised by the name
-     * binding actually matches on.
-     *
-     * <p>Read here by reflection rather than carried on {@link DataClassField}, because it answers a
-     * <em>TSON</em> question -- "is a schema field expected to fill this?" -- that {@code ltr8-bind}'s
-     * generic descriptor has no notion of: the descriptor knows components, not schemas. Both the record
-     * component and its accessor are consulted, so the marker works wherever a class can put it.
-     */
-    private static Set<String> unboundComponents(Class<?> type) {
-        RecordComponent[] components = type.getRecordComponents();
-        if (components == null) {
-            return Set.of();
-        }
-        Set<String> unbound = new LinkedHashSet<>();
-        for (RecordComponent component : components) {
-            if (!component.isAnnotationPresent(Unbound.class)
-                    && !component.getAccessor().isAnnotationPresent(Unbound.class)) {
-                continue;
-            }
-            io.ltr8.annotation.Field renamed = component.getAnnotation(io.ltr8.annotation.Field.class);
-            if (renamed == null) {
-                renamed = component.getAccessor().getAnnotation(io.ltr8.annotation.Field.class);
-            }
-            unbound.add(renamed != null && !renamed.value().isEmpty() ? renamed.value() : component.getName());
-        }
-        return unbound;
     }
 
     /**

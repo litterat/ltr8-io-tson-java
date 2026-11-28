@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -183,6 +184,37 @@ class JsonBindRecordReadTest {
                                          @Unbound String nickname) {
     }
 
+    /** {@code @Unbound} on the explicit canonical constructor's parameter alone. */
+    public record PersonWithUnboundParameter(UUID id, String name, long age, LocalDate born, Address home, int level,
+                                             String nickname) {
+        public PersonWithUnboundParameter(UUID id, String name, long age, LocalDate born, Address home, int level,
+                                          @Unbound String nickname) {
+            this.id = id;
+            this.name = name;
+            this.age = age;
+            this.born = born;
+            this.home = home;
+            this.level = level;
+            this.nickname = nickname;
+        }
+    }
+
+    /** {@code alias} binds the name {@code nickname}, which the class's own component {@code nickname} gives up. */
+    public record PersonRenamedAway(UUID id, String name, long age, LocalDate born, Address home, int level,
+                                    @Unbound String nickname, @Field("nickname") String alias) {
+        public PersonRenamedAway(UUID id, String name, long age, LocalDate born, Address home, int level,
+                                 @Field("handle") String nickname, String alias) {
+            this.id = id;
+            this.name = name;
+            this.age = age;
+            this.born = born;
+            this.home = home;
+            this.level = level;
+            this.nickname = nickname;
+            this.alias = alias;
+        }
+    }
+
     public record PersonWithStructuredName(UUID id, Address name, long age, LocalDate born, Address home,
                                            int level) {
     }
@@ -200,6 +232,29 @@ class JsonBindRecordReadTest {
                 () -> compile(Map.of("address", Address.class, "person", PersonWithExtra.class)));
         assertTrue(e.getMessage().contains("component 'nickname' is filled by no field"), e.getMessage());
         compile(Map.of("address", Address.class, "person", PersonWithUnboundExtra.class));
+    }
+
+    @Test
+    void aComponentUnboundOnItsConstructorParameterAloneIsTheClassesOwn() {
+        JsonCompiledSchema compiled = compile(Map.of("address", Address.class,
+                "person", PersonWithUnboundParameter.class));
+        List<Diagnostic> problems = new ArrayList<>();
+        DiagnosticsReceiver receiver = problems::add;
+        try (ByteSource bytes = ByteSource.of(ADA)) {
+            Object value = compiled.get("person").read(JsonReadContext.of(
+                    new JsonStream(bytes, ProcessorPolicy.defaults(), receiver), receiver));
+            assertEquals(List.of(), problems);
+            assertEquals(new PersonWithUnboundParameter(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"),
+                    "Ada", 36L, null, new Address("1 Analytical Way", "London"), 1, null), value);
+        }
+    }
+
+    /** An unbound component is matched by no name, so its Java name excuses no other component. */
+    @Test
+    void aComponentNamedAsAnUnboundOneIsStillFilledByAField() {
+        BindMismatchException e = assertThrows(BindMismatchException.class,
+                () -> compile(Map.of("address", Address.class, "person", PersonRenamedAway.class)));
+        assertTrue(e.getMessage().contains("component 'nickname' is filled by no field"), e.getMessage());
     }
 
     @Test
