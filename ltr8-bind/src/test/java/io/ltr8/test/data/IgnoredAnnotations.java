@@ -28,6 +28,8 @@ import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.test.data.BridgedFields.NumberAsText;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -698,6 +700,23 @@ public final class IgnoredAnnotations {
 
 		@Field("k")
 		String KEY = "key";
+	}
+
+	public static final class ListWithField<T> extends ArrayList<T> {
+
+		private static final long serialVersionUID = 1L;
+
+		@Field("n")
+		private String note;
+	}
+
+	public static final class MapWithParameter<K, V> extends HashMap<K, V> {
+
+		private static final long serialVersionUID = 1L;
+
+		public MapWithParameter(@Unbound int capacity) {
+			super(capacity);
+		}
 	}
 
 	/** The members read the union's method as their component's. */

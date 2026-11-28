@@ -2,31 +2,22 @@ package io.ltr8.bind.analysis;
 
 
 import io.ltr8.annotation.DataBridge;
-import io.ltr8.annotation.Record;
-import io.ltr8.annotation.ToData;
-import io.ltr8.annotation.Transparent;
-import io.ltr8.annotation.Tuple;
 import io.ltr8.annotation.Typename;
-import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.bind.analysis.ClassSignals.Signal;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Modifier;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.bind.DataClassAnnotated;
 import java.lang.reflect.ParameterizedType;
-import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Type;
-import java.util.Collection;
-import java.util.Map;
 import java.util.function.Supplier;
 
 public class ClassBinder {
@@ -47,7 +38,7 @@ public class ClassBinder {
 
 		recordBinder = new RecordBinder();
 		atomBinder = new AtomBinder();
-		unionBinder = new UnionBinder(this::describedAsUnion);
+		unionBinder = new UnionBinder();
 		arrayBinder = new ArrayBinder();
 		mapBinder = new MapBinder();
 		tupleBinder = new TupleBinder();
@@ -118,22 +109,21 @@ public class ClassBinder {
 	 * back; a class carrying {@code @Atom} that says either badly is refused here as it is by {@link #resolve}.
 	 *
 	 * <p>Exposed for {@code DataBindContext.registerAtom}, so that registering a class as an atom finds the
-	 * form it already declares rather than replacing it with one that states nothing. {@link #resolve}
-	 * cannot serve that: it dispatches on shape, so a record carrying {@code @Atom} is claimed by
-	 * {@code isRecord} before {@code isAtom} is ever asked.
+	 * form it already declares rather than replacing it with one that states nothing. Its kind is
+	 * {@link Kind#asAtom}, not {@link #resolve}'s.
 	 *
 	 * <p>A primitive is not asked -- {@link AtomBinder} refuses one outright, on the grounds that
 	 * reaching it means the primitives were never registered.
 	 */
 	public DataClassAtom atomForm(DataBindContext context, Class<?> targetClass) throws CodeAnalysisException {
-		refuseBlankTypename(targetClass);
-		if (targetClass.isPrimitive()) {
-			return null;
-		}
-		if (targetClass.isEnum()) {
-			return atomBinder.resolveEnum(targetClass);
-		}
-		return atomBinder.resolveAtom(context, targetClass);
+		ClassSignals signals = ClassSignals.of(targetClass);
+		refuseBlankTypename(signals);
+		return switch (Kind.asAtom(signals.present())) {
+			case ENUM -> atomBinder.resolveEnum(targetClass);
+			// A way out marked with no way in is refused, though it makes no class an atom.
+			case ATOM, NONE -> signals.has(Signal.PRIMITIVE) ? null : atomBinder.resolveAtom(context, signals);
+			default -> throw new IllegalStateException(targetClass.getName() + " has no atom form's kind");
+		};
 	}
 
 	/** The form {@code DataBindContext.registerAtom} gives {@code targetClass} through {@code bridge}. */
@@ -147,159 +137,39 @@ public class ClassBinder {
 	 * class a descriptor describes passes here first: through {@link #resolve}, a registration, or an embedded union.
 	 */
 	static void refuseBlankTypename(Class<?> targetClass) throws CodeAnalysisException {
-		Typename typename = targetClass.getAnnotation(Typename.class);
+		refuseBlankTypename(targetClass, targetClass.getAnnotation(Typename.class));
+	}
+
+	private static void refuseBlankTypename(ClassSignals signals) throws CodeAnalysisException {
+		refuseBlankTypename(signals.type(), signals.typename());
+	}
+
+	private static void refuseBlankTypename(Class<?> targetClass, Typename typename) throws CodeAnalysisException {
 		if (typename != null && typename.name().isBlank()) {
 			throw new CodeAnalysisException(String.format("%s carries @Typename(name = \"%s\"), which is blank",
 					targetClass.getName(), typename.name()));
 		}
 	}
 
-	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)
+	public DataClass resolve(DataBindContext context, Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
-
-		refuseBlankTypename(targetClass);
-		DataClass result = null;
-
-		// If this is a schema first situation then this will return a definition and the job is to bind to
-		// it. If it is a code first situation then we expect this to throw an exception, and we need to
-		// first create the definition and then bind the class to that definition.
-
-		if (targetClass == Annotated.class) {
-			// Checked before isRecord: Annotated is itself a record, and binding it as one would make its
-			// annotations an authored field rather than the framing they are.
-			result = annotatedDescriptor(context, targetClass, parameterizedType);
-		} else if (targetClass.isAnnotationPresent(Transparent.class)) {
-			// Checked ahead of every kind test, and of isRecord in particular: a transparent wrapper is
-			// always a record, so isRecord would claim it first and bind the framing as the shape. What
-			// comes back is the wrapped component's own descriptor with a bridge, never a kind of its own.
-			result = transparentBinder.resolve(context, targetClass);
-		} else if (isTuple(targetClass)) {
-			// Checked ahead of isRecord: a genuine Java record annotated @Tuple would otherwise be
-			// claimed by isRecord()'s own isRecord() check first.
-			result = tupleBinder.resolveTuple(context, targetClass);
-		} else if (isRecord(targetClass)) {
-			result = recordBinder.resolveRecord(context, targetClass, parameterizedType);
-		} else if (targetClass.isEnum()) {
-			// A plain Java enum needs no annotation, the same as record/array -- Class#isEnum() is
-			// exactly as unambiguous a JDK signal as Class#isRecord(). Binds via EnumStringBridge
-			// (by name()); a caller wanting a different representation (by ordinal, by a custom
-			// code) pre-registers their own bridge on the DataBindContext instead, the same
-			// override mechanism every other auto-detected type already has -- an explicit
-			// registration is cached and short-circuits this resolver entirely. Checked ahead of
-			// isUnion: the JDK seals an enum with a constant body, permitting the body's class.
-			result = atomBinder.resolveEnum(targetClass);
-		} else if (isUnion(targetClass)) {
-			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
-		} else if (isAtom(targetClass)) {
-			result = atomBinder.resolveAtom(context, targetClass);
-		} else if (isMap(targetClass)) {
-			// Checked ahead of isArray: Map is not a Collection, so there's no auto-detection
-			// collision between the two -- this ordering just keeps the more specific check first.
-			result = mapBinder.resolveMap(context, targetClass, parameterizedType);
-		} else if (isArray(targetClass)) {
-			result = arrayBinder.resolveArray(context, targetClass, parameterizedType);
-		} else {
-			throw new DataBindException(
+		ClassSignals signals = ClassSignals.of(targetClass);
+		refuseBlankTypename(signals);
+		return switch (signals.kind()) {
+			case ANNOTATED -> annotatedDescriptor(context, targetClass, parameterizedType);
+			case TRANSPARENT -> transparentBinder.resolve(context, signals);
+			case TUPLE -> tupleBinder.resolveTuple(context, signals);
+			case RECORD -> recordBinder.resolveRecord(context, targetClass, parameterizedType);
+			case BRIDGED -> recordBinder.resolveBridged(context, signals);
+			// Another representation of an enum is a bridge registered on the context, cached ahead of this.
+			case ENUM -> atomBinder.resolveEnum(targetClass);
+			case UNION -> unionBinder.resolveUnion(signals);
+			case ATOM -> atomBinder.resolveAtom(context, signals);
+			case MAP -> mapBinder.resolveMap(context, targetClass, parameterizedType);
+			case ARRAY -> arrayBinder.resolveArray(context, signals, parameterizedType);
+			case NONE -> throw new DataBindException(
 					String.format("Unable to find a valid data conversion for class: %s", targetClass));
-		}
-
-		return result;
-	}
-
-
-	/** Whether {@link #resolve} describes {@code targetClass} as a union: no kind it asks about first claims it. */
-	private boolean describedAsUnion(Class<?> targetClass) {
-		return targetClass != Annotated.class && !targetClass.isAnnotationPresent(Transparent.class)
-				&& !isTuple(targetClass) && !isRecord(targetClass) && !targetClass.isEnum() && isUnion(targetClass);
-	}
-
-	private boolean isUnion(Class<?> targetClass) {
-		if (Collection.class.isAssignableFrom(targetClass)) {
-			return false;
-		}
-
-		// If the targetClass is using sealed interfaces then it provides the union type.
-		if (targetClass.isSealed()) {
-			return true;
-		}
-
-		if (targetClass.isInterface()) {
-
-			// Interface needs to be marked with @Data or Serializable.
-			Union unionAnnotation = targetClass
-					.getAnnotation(Union.class);
-			if (unionAnnotation != null) {
-				return true;
-			}
-
-		} else
-
-		if (Modifier.isAbstract(targetClass.getModifiers())) {
-			// Array classes are abstract and we don't want them.
-			if (targetClass.isArray()) {
-				// this is classed as an array, not a union.
-				return false;
-			}
-
-			// Interface needs to be marked with @Data or Serializable.
-			Union unionAnnotation = targetClass
-					.getAnnotation(Union.class);
-			if (unionAnnotation != null) {
-				return true;
-			}
-
-			return false;
-		}
-
-		return false;
-	}
-
-	private boolean isTuple(Class<?> targetClass) {
-		return targetClass.getAnnotation(Tuple.class) != null;
-	}
-
-	private boolean isRecord(Class<?> targetClass) {
-
-		// A genuine Java record needs no annotation -- RecordComponentFinder reads it directly.
-		if (targetClass.isRecord()) {
-			return true;
-		}
-
-		// A hand-written (pre-record, or simply not a record) immutable tuple class, identified
-		// by @Record on the class or a constructor -- ImmutableFinder matches its constructor
-		// arguments to fields via bytecode analysis.
-		Record recordAnnotation = targetClass.getAnnotation(Record.class);
-		if (recordAnnotation != null) {
-			return true;
-		}
-
-		Constructor<?>[] constructors = targetClass.getConstructors();
-		for (Constructor<?> constructor : constructors) {
-			recordAnnotation = constructor.getAnnotation(Record.class);
-			if (recordAnnotation != null) {
-				return true;
-			}
-		}
-
-		// A ToData class marking @Atom is an atom, and ToData at most its way out; any other is bridged to its record.
-		return ToData.class.isAssignableFrom(targetClass) && !AtomBinder.marksAtom(targetClass);
-    }
-
-	private boolean isArray(Class<?> targetClass) {
-
-		if (targetClass.isArray() || Collection.class.isAssignableFrom(targetClass)) {
-			return true;
-		}
-
-		return false;
-	}
-
-	private boolean isMap(Class<?> targetClass) {
-		return Map.class.isAssignableFrom(targetClass);
-	}
-
-	private boolean isAtom(Class<?> targetClass) {
-		return targetClass.isPrimitive() || AtomBinder.marksAtom(targetClass);
+		};
 	}
 
 }

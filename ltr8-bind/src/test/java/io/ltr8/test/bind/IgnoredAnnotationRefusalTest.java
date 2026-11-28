@@ -16,7 +16,9 @@
 package io.ltr8.test.bind;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.BridgedFields.NumberAsText;
@@ -43,6 +45,8 @@ import io.ltr8.test.data.IgnoredAnnotations.ImplementsTouched;
 import io.ltr8.test.data.IgnoredAnnotations.InheritedFieldOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.LabelledMember;
 import io.ltr8.test.data.IgnoredAnnotations.LabelledUnion;
+import io.ltr8.test.data.IgnoredAnnotations.ListWithField;
+import io.ltr8.test.data.IgnoredAnnotations.MapWithParameter;
 import io.ltr8.test.data.IgnoredAnnotations.MethodAnnotatedProtocol;
 import io.ltr8.test.data.IgnoredAnnotations.MethodOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.MethodParameterOfNoComponent;
@@ -95,6 +99,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * A binding annotation is never silently ignored: it is applied, or the class is refused, naming the class, the
@@ -304,6 +309,17 @@ class IgnoredAnnotationRefusalTest {
 	}
 
 	@Test
+	void aMapOrACollectionRefusesEveryBindingAnnotationOnItsMembers() {
+		assertAll(
+				refusedAt(new DataParameterizedType(ListWithField.class, String.class), ListWithField.class.getName()
+						+ " is a collection, written as its elements, so nothing reads @Field on the field "
+						+ "ListWithField.note"),
+				refusedAt(new DataParameterizedType(MapWithParameter.class, String.class, String.class),
+						MapWithParameter.class.getName() + " is a map, written as its entries, so nothing reads "
+								+ "@Unbound on parameter 0 of the constructor MapWithParameter(int)"));
+	}
+
+	@Test
 	void aClassDescribedByNoComponentsOfItsOwnRefusesEveryBindingAnnotationOnItsMethodsParameters() {
 		assertAll(
 				refusedAlone(DataBindContext::builder, EnumMethodParameter.class, EnumMethodParameter.class.getName()
@@ -379,6 +395,12 @@ class IgnoredAnnotationRefusalTest {
 	private static Executable refusedAlone(Supplier<DataBindContext.Builder> builder, Class<?> type, String message) {
 		return () -> assertAll(Stream.of(1, 2).<Executable>map(run -> () -> assertEquals(List.of(message),
 				messages(builder.get().build(), type), type.getSimpleName() + ", context " + run)));
+	}
+
+	private static Executable refusedAt(DataParameterizedType at, String message) {
+		Class<?> type = (Class<?>) at.getRawType();
+		return () -> assertEquals(message, assertThrows(DataBindException.class, () -> PLAIN.getDescriptor(type, at))
+				.getMessage(), type.getSimpleName());
 	}
 
 	private static List<String> messages(DataBindContext context, Class<?> type) {
