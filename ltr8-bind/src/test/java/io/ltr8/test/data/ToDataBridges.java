@@ -146,6 +146,30 @@ public final class ToDataBridges {
 	public interface SkuError extends ToData<SkuNotFound> {
 	}
 
+	public interface SkuDefault extends ToData<SkuNotFound> {
+
+		String sku();
+
+		@Override
+		default SkuNotFound toData() {
+			return new SkuNotFound(sku());
+		}
+	}
+
+	public static class DeclaresToDataInheritingADefault implements ToData<SkuNotFound>, SkuDefault {
+
+		private final String sku;
+
+		public DeclaresToDataInheritingADefault(SkuNotFound data) {
+			this.sku = data.sku();
+		}
+
+		@Override
+		public String sku() {
+			return sku;
+		}
+	}
+
 	public static class InheritsFromInterface implements SkuError {
 
 		private final String sku;

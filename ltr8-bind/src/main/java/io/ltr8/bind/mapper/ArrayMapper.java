@@ -201,13 +201,17 @@ public class ArrayMapper {
 		return toArray(context.getDescriptor(o.getClass()), o);
 	}
 
+	/** @throws DataBindException where {@code clss} is written as one value, which is no array */
 	public Object[] toArray(DataClass clss, Object o) throws Throwable {
 		Objects.requireNonNull(o);
 
 		ArrayFunctions af = getFunctions(clss);
 
-		// create and fill array with project instance.
-		return (Object[]) af.toArray.invoke(o);
+		if (!(af.toArray.invoke(o) instanceof Object[] written)) {
+			throw new DataBindException(String.format("%s is not written as an array: an ArrayMapper writes an atom "
+					+ "only inside a record, tuple, list, map or union", clss.typeClass().getTypeName()));
+		}
+		return written;
 	}
 
 	/**

@@ -38,7 +38,10 @@ import io.ltr8.test.data.AtomForms.FactoryBesideConstructor;
 import io.ltr8.test.data.AtomForms.FactoryReturningAnotherType;
 import io.ltr8.test.data.AtomForms.FactoryWithoutWayOut;
 import io.ltr8.test.data.AtomForms.Holder;
+import io.ltr8.test.data.AtomForms.InheritsDefaultToData;
+import io.ltr8.test.data.AtomForms.InheritsDefaultToDataOfAHiddenInterface;
 import io.ltr8.test.data.AtomForms.InheritsMarkedAccessor;
+import io.ltr8.test.data.AtomForms.InterfaceAtom;
 import io.ltr8.test.data.AtomForms.InheritsToData;
 import io.ltr8.test.data.AtomForms.InheritsToDataThroughATypeArgument;
 import io.ltr8.test.data.AtomForms.Keys;
@@ -98,6 +101,8 @@ class AtomFormTest {
 			new Form(new InheritsToData("A-7"), "A-7", String.class),
 			new Form(new InheritsToDataThroughATypeArgument(8L), 8L, long.class),
 			new Form(new InheritsMarkedAccessor("A-9"), "A-9", String.class),
+			new Form(new InheritsDefaultToData("A-10"), "A-10", String.class),
+			new Form(new InheritsDefaultToDataOfAHiddenInterface("A-11"), "A-11", String.class),
 			new Form(Plain.ONE, "ONE", String.class),
 			new Form(Marked.TWO, "TWO", String.class));
 
@@ -177,6 +182,33 @@ class AtomFormTest {
 			assertEquals(form.dataClass(), registered.dataClass(), type.getSimpleName());
 			assertTrue(registered.bridge().isPresent(), type.getSimpleName());
 		}));
+	}
+
+	@Test
+	void anInterfaceIsAnAtomWrittenThroughTheToDataItInherits() throws DataBindException {
+		DataClassAtom atom = assertInstanceOf(DataClassAtom.class, context.getDescriptor(InterfaceAtom.class));
+		assertEquals(String.class, atom.dataClass());
+		Object written = maps.toMap(atom, InterfaceAtom.of("A-12"));
+		assertEquals("A-12", written);
+		InterfaceAtom read = assertInstanceOf(InterfaceAtom.class, maps.toObject(atom, written));
+		assertEquals("A-12", read.toData());
+	}
+
+	@Test
+	void anInterfaceAtomRoundTripsAsARecordComponentThroughBothMappers() {
+		DataClass holder = described(Holder.class, InterfaceAtom.class);
+		Holder<InterfaceAtom> value = new Holder<>(InterfaceAtom.of("A-13"));
+		assertAll(() -> {
+			Object written = maps.toMap(holder, value);
+			assertEquals(Map.of("value", "A-13"), written);
+			Holder<?> read = assertInstanceOf(Holder.class, maps.toObject(holder, written));
+			assertEquals("A-13", assertInstanceOf(InterfaceAtom.class, read.value()).toData());
+		}, () -> {
+			Object[] written = arrays.toArray(holder, value);
+			assertEquals(List.of("A-13"), Arrays.asList(written));
+			Holder<?> read = assertInstanceOf(Holder.class, arrays.toObject(holder, written));
+			assertEquals("A-13", assertInstanceOf(InterfaceAtom.class, read.value()).toData());
+		});
 	}
 
 	@Test
