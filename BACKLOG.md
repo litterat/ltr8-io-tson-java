@@ -540,11 +540,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
   (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
   up as itself, naming the class.
-- [ ] **A user collection class in a named module is refused for its `size`.** `ArrayBinder.getSizeMethodHandle` finds
-  `size` through `MethodHandles.lookup()`, `ltr8-bind`'s own, which reads no user module: on the module path an
-  exported collection class is refused with "Failed to get array descriptor" (shown in an experiment outside the
-  suite, which runs on the class path). Find it through the public lookup, and add a test that runs a binding from a
-  named module.
 - [ ] **`DataBindContext.registerAtom` unreflects a user bridge.** A bridge the public lookup cannot reach is refused
   with "Failed to register atom bridge", naming no class, over a cause whose text carries an identity hash. Read, not
   run. Look `toData` and `toObject` up by name and type, as `RecordFields.fieldBridge` does, and name the bridge.
