@@ -72,7 +72,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry bind(DataBindContext context) {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
-                new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
+                new MapBindReader.Factory(context), new TupleBindReader.Factory(),
                 AtomTypeReader.ATOM, AtomTypeReader.VOID, UnaryOperator.identity(),
                 ChoiceReader.FACTORY), context);
     }

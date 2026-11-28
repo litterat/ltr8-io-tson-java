@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
-import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.base.MissingBindingException;
@@ -137,14 +136,12 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         }
     }
 
-    /** Validates both halves of what {@link #TupleBindReader} needs before ever constructing one -- {@code typeDefinition} is tuple-shaped, and {@code context} resolves {@code name} to a real, tuple-shaped {@link DataClassTuple} -- matching {@link RecordBindReader.Factory}'s own reasoning. */
+    /**
+     * Validates both halves of what {@link #TupleBindReader} needs before ever constructing one -- {@code
+     * typeDefinition} is tuple-shaped, and the compile's binding binds {@code name} to a tuple-shaped {@link
+     * DataClassTuple} -- matching {@link RecordBindReader.Factory}'s own reasoning.
+     */
     public static final class Factory implements ValueReaderFactory {
-
-        private final DataBindContext context;
-
-        public Factory(DataBindContext context) {
-            this.context = context;
-        }
 
         @Override
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {

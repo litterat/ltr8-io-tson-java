@@ -292,15 +292,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
 
     /**
-     * Validates what {@link #RecordBindReader} needs before ever constructing one, and owns the
-     * decision (and the {@link DataBindContext} that decision needs) about whether a record-shaped
-     * declaration also needs subtype dispatch -- keeping that concern local to this factory rather
-     * than a generic, orchestrator-level step is what keeps {@link DataBindContext} itself out of
-     * the orchestrator entirely; the orchestrator only ever calls {@link #create}, whose signature
-     * carries no {@link DataBindContext} at all. {@code context} is fixed once, at this factory's
-     * own construction, not threaded through {@link #create} -- one {@link DataBindContext} governs
-     * every entry a given compiled schema binds, the same way a {@link Factory} instance gets
-     * created once and reused across a whole compile, not once per entry.
+     * Validates what {@link #RecordBindReader} needs before ever constructing one, and owns the decision about whether
+     * a record-shaped declaration also needs subtype dispatch. Which class an entry binds to is the compile's binding's
+     * answer ({@link ValueReaderContext#bound}); {@code context}, fixed at this factory's construction, describes only
+     * what no entry names -- a labelled choice's members.
      *
      * <p><b>Three real shapes, not two.</b> When {@code context.subtypesOf(name, typeDefinition)} is empty, {@code
      * name} must resolve to a {@link DataClassRecord} -- the ordinary case, no dispatch wrapper at
