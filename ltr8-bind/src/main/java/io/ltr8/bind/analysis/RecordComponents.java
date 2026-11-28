@@ -70,6 +70,7 @@ final class RecordComponents {
 		if (dataOrder != null) {
 			reorderFields(targetClass, dataOrder, components);
 		}
+		ComponentAnnotations.refuseUnapplied(targetClass, components);
 		return components;
 	}
 

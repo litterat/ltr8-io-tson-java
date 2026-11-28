@@ -15,20 +15,32 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.analysis.ComponentInfo.Member;
 import io.ltr8.bind.analysis.ComponentInfo.Role;
 
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.RecordComponent;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A component's {@link Field @Field}, {@link Union @Union} and {@link Unbound @Unbound}, read from every member its
@@ -41,6 +53,9 @@ import java.util.stream.Collectors;
  * another shape than the record's header describes.
  */
 final class ComponentAnnotations {
+
+	private static final Set<Class<?>> OPTIONALS = Set.of(Optional.class, OptionalInt.class, OptionalLong.class,
+			OptionalDouble.class);
 
 	private ComponentAnnotations() {
 	}
@@ -129,6 +144,147 @@ final class ComponentAnnotations {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Refuses a binding annotation that nothing applies, once {@link #read} has settled {@code components}: one an
+	 * {@code @Unbound} component, the {@link Annotations} carrier or a component whose data class something else
+	 * decides never reads, and one on a field or method of {@code described} or a super class that is a member of no
+	 * component. A class declaring a {@code @Profile} constructor is spared the last for its instance members, which
+	 * may be another profile's components.
+	 */
+	static void refuseUnapplied(Class<?> described, List<ComponentInfo> components) throws CodeAnalysisException {
+		for (ComponentInfo component : components) {
+			for (Member member : component.members()) {
+				refuseUnapplied(component, member);
+			}
+		}
+		// A method is a member where a subclass's override or visibility bridge of it is: a call dispatches there.
+		Set<Object> members = new HashSet<>();
+		for (ComponentInfo component : components) {
+			for (Member member : component.members()) {
+				members.add(member.element() instanceof Method method ? signature(method) : member.element());
+			}
+		}
+		boolean profiled = Stream.of(described.getDeclaredConstructors())
+				.anyMatch(constructor -> constructor.isAnnotationPresent(Profile.class));
+		for (Class<?> declarer = described; declarer != null && declarer != Object.class
+				&& declarer != java.lang.Record.class; declarer = declarer.getSuperclass()) {
+			for (AnnotatedElement element : declaredMembers(declarer)) {
+				String annotation = bindingAnnotation(element);
+				Object member = element instanceof Method method && !isStatic(method) ? signature(method) : element;
+				if (annotation != null && !members.contains(member) && (!profiled || isStatic(element))) {
+					throw new CodeAnalysisException(String.format(
+							"%s's %s carries %s, but is a member of no component, so nothing reads it",
+							described.getName(), describe(element), annotation));
+				}
+			}
+		}
+	}
+
+	private static void refuseUnapplied(ComponentInfo component, Member member) throws CodeAnalysisException {
+		Field field = member.element().getAnnotation(Field.class);
+		Union union = member.element().getAnnotation(Union.class);
+		String stated = field != null && field.required() ? "@Field(" + Attribute.REQUIRED.show(true) + ")"
+				: field != null && field.bridge() != DataBridge.class
+						? "@Field(" + Attribute.BRIDGE.show(field.bridge()) + ")"
+						: union != null ? show(union) : null;
+		if (component.isUnbound() && stated != null) {
+			throw new CodeAnalysisException(String.format(
+					"%s's component '%s' is @Unbound, so nothing reads or writes it, but %s carries %s",
+					component.getDescribed().getName(), component.getName(), describe(member), stated));
+		}
+		if (component.getType() == Annotations.class) {
+			// Always present, so required = true is true of it already.
+			String unread = field != null && field.bridge() != DataBridge.class
+					? "@Field(" + Attribute.BRIDGE.show(field.bridge()) + ")" : union != null ? show(union) : null;
+			if (unread != null) {
+				throw new CodeAnalysisException(String.format("%s's component '%s' is its Annotations carrier, "
+						+ "filled from the value's own annotations, but %s carries %s",
+						component.getDescribed().getName(), component.getName(), describe(member), unread));
+			}
+			return;
+		}
+		String decides = component.getBridge() != null
+				? "its @Field(" + Attribute.BRIDGE.show(component.getBridge()) + ")"
+				: OPTIONALS.contains(component.getType()) ? "its type " + component.getType().getName() : null;
+		if (union != null && decides != null) {
+			throw new CodeAnalysisException(String.format(
+					"%s's component '%s' has %s on %s, which nothing consults: %s decides its data class",
+					component.getDescribed().getName(), component.getName(), show(union), describe(member), decides));
+		}
+	}
+
+	/**
+	 * Refuses {@code record}, which its binder writes without reading any binding annotation of its own, where one
+	 * of its fields or methods, or a parameter of its canonical constructor, carries one.
+	 *
+	 * @param written how the binder writes it, completing "{@code record} ..."
+	 */
+	static void refuseAny(Class<?> record, String written) throws CodeAnalysisException {
+		List<AnnotatedElement> elements = new ArrayList<>(declaredMembers(record));
+		Class<?>[] types = Stream.of(record.getRecordComponents()).map(RecordComponent::getType)
+				.toArray(Class<?>[]::new);
+		try {
+			elements.addAll(List.of(record.getDeclaredConstructor(types).getParameters()));
+		} catch (NoSuchMethodException e) {
+			throw new IllegalStateException(String.format("Record %s declares no canonical constructor",
+					record.getName()), e);
+		}
+		for (AnnotatedElement element : elements) {
+			String annotation = bindingAnnotation(element);
+			if (annotation != null) {
+				throw new CodeAnalysisException(String.format("%s %s, so nothing reads %s on %s", record.getName(),
+						written, annotation, element instanceof Parameter ? describe(element)
+								: "the " + describe(element).replaceFirst("^static ", "")));
+			}
+		}
+	}
+
+	/** The fields and methods {@code declarer} declares itself; a bridge or synthetic member is the compiler's. */
+	private static List<AnnotatedElement> declaredMembers(Class<?> declarer) {
+		List<AnnotatedElement> declared = new ArrayList<>();
+		for (java.lang.reflect.Field field : declarer.getDeclaredFields()) {
+			if (!field.isSynthetic()) {
+				declared.add(field);
+			}
+		}
+		for (Method method : declarer.getDeclaredMethods()) {
+			if (!method.isSynthetic() && !method.isBridge()) {
+				declared.add(method);
+			}
+		}
+		return declared;
+	}
+
+	private static List<Object> signature(Method method) {
+		return List.of(method.getName(), List.of(method.getParameterTypes()));
+	}
+
+	private static String bindingAnnotation(AnnotatedElement element) {
+		return element.isAnnotationPresent(Field.class) ? "@Field"
+				: element.isAnnotationPresent(Union.class) ? "@Union"
+						: element.isAnnotationPresent(Unbound.class) ? "@Unbound" : null;
+	}
+
+	private static boolean isStatic(AnnotatedElement element) {
+		return element instanceof java.lang.reflect.Member member && Modifier.isStatic(member.getModifiers());
+	}
+
+	private static String describe(AnnotatedElement element) {
+		String modifier = isStatic(element) ? "static " : "";
+		return switch (element) {
+			case java.lang.reflect.Field field -> modifier + "field " + field.getDeclaringClass().getSimpleName() + "."
+					+ field.getName();
+			case Method method -> modifier + "method " + method.getDeclaringClass().getSimpleName() + "."
+					+ method.getName() + parameters(method);
+			case Parameter parameter -> {
+				Executable executable = parameter.getDeclaringExecutable();
+				yield "parameter " + List.of(executable.getParameters()).indexOf(parameter) + " of the constructor "
+						+ executable.getDeclaringClass().getSimpleName() + parameters(executable);
+			}
+			default -> throw new IllegalStateException(element + " is no field, method or parameter");
+		};
 	}
 
 	/**

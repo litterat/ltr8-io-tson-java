@@ -16,6 +16,9 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
   unwrapped, however deep the class sits (`RecordRefusalTest`).
 - A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`
   (`ToDataBridgeTest`).
+- A binding annotation is never silently ignored: `@Field`, `@Union` or `@Unbound` is applied, or the class is
+  refused (`IgnoredAnnotationRefusalTest`); a component's members merge `@Field` by attribute and must agree
+  (`ComponentAnnotationPrecedenceTest`).
 - A `@Field` bridge, unlike a `ToData` class, may inherit `DataBridge<D, O>`; both arguments must resolve to classes
   (`BridgedFieldTest`, `RecordRefusalTest`).
 - Also describes an interface (`getProtocol`); an exchange's invoker catches and wraps no throwable (`ExchangeHandlerTest`).

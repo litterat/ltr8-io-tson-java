@@ -40,6 +40,8 @@ public class TupleBinder {
 					+ "described by its own components");
 		}
 
+		ComponentAnnotations.refuseAny(targetClass, "is a @Tuple, written as its components by position");
+
 		RecordComponent[] components = targetClass.getRecordComponents();
 
 		try {

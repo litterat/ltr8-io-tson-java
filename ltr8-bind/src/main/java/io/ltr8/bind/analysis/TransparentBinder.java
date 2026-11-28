@@ -51,6 +51,7 @@ final class TransparentBinder {
             throw new DataBindException(targetClass.getName() + " carries @FieldOrder, but is @Transparent, written "
                     + "as its one component; an order applies only to a class described by its own components");
         }
+        ComponentAnnotations.refuseAny(targetClass, "is @Transparent, written as its one component");
         DataClassBridge bridge = bridge(targetClass, component);
         DataClass wrapped = context.getDescriptor(component.getType(), component.getGenericType());
         if (wrapped.bridge().isPresent()) {
