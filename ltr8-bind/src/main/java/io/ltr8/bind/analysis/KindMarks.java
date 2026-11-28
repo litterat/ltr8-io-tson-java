@@ -98,18 +98,21 @@ final class KindMarks {
 		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
 				Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM, Walk.BRIDGED_RECORD));
 		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
-				Signal.TO_DATA), Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Set.of(Signal.MAP, Signal.COLLECTION), Walk.UNREAD,
+				Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.UNION, reading(but(all, Signal.FIELD_ORDER), Set.of(), Set.of(Signal.MAP, Signal.COLLECTION),
+				Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ATOM, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
+				Walk.INHERITED_WAY_IN));
+		RESOLVED.put(Kind.MAP, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ARRAY, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
 				Walk.ATOM));
-		RESOLVED.put(Kind.ATOM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
-		RESOLVED.put(Kind.MAP, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.ARRAY, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.NONE, reading(but(all, Signal.UNION), Set.of()));
 
 		REGISTERED.put(Kind.ENUM, RESOLVED.get(Kind.ENUM));
 		// An interface or abstract class registered as an atom is a union where it is described.
-		REGISTERED.put(Kind.ATOM, reading(all, Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
-		REGISTERED.put(Kind.NONE, reading(all, Set.of()));
+		REGISTERED.put(Kind.ATOM, reading(but(all, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
+				Walk.INHERITED_WAY_IN));
+		REGISTERED.put(Kind.NONE, reading(but(all, Signal.FIELD_ORDER), Set.of()));
 		if (!RESOLVED.keySet().containsAll(EnumSet.allOf(Kind.class))) {
 			throw new IllegalStateException("A kind has no reading: " + RESOLVED.keySet());
 		}
@@ -159,7 +162,9 @@ final class KindMarks {
 			}
 		}
 		Class<?> bridgedTo = kind == Kind.BRIDGED ? ToDataBridges.findToDataClass(signals.type()) : null;
-		String written = written(kind, signals, null, bridgedTo);
+		String written = entry == Entry.REGISTER_ATOM && kind == Kind.NONE ? "is registered as an atom with no form "
+				+ "of its own" : entry == Entry.REGISTER_ATOM && kind == Kind.ATOM ? "is registered as an atom, written "
+						+ "as the value its way out returns" : written(kind, signals, null, bridgedTo);
 		// Whichever entry point describes it, nothing makes a concrete class a union by its mark.
 		if (signals.has(Signal.UNION) && !signals.has(Signal.ABSTRACT) && !signals.has(Signal.SEALED)) {
 			throw unread(kind, signals, Signal.UNION, written, bridgedTo);
@@ -283,17 +288,9 @@ final class KindMarks {
 					kind == Kind.NONE ? "is a concrete class" : written));
 		}
 		if (mark == Signal.FIELD_ORDER) {
-			return switch (kind) {
-				case TRANSPARENT -> new DataBindException(type.getName() + " carries @FieldOrder, but is @Transparent, "
-						+ "written as its one component; an order applies only to a class described by its own "
-						+ "components");
-				case TUPLE -> new CodeAnalysisException(type.getName() + " carries @FieldOrder, but is a @Tuple, whose "
-						+ "elements are its record components in declared order; an order applies only to a class "
-						+ "described by its own components");
-				default -> new DataBindException(String.format("%s carries @FieldOrder, but %s; an order applies only "
-						+ "to a class described by its own components, so it belongs on %s", type.getName(), written,
-						bridgedTo.getName()));
-			};
+			return new CodeAnalysisException(String.format("%s carries @FieldOrder, but %s; an order applies only to a "
+					+ "class described by its own components, so %s", type.getName(), written,
+					bridgedTo != null ? "it belongs on " + bridgedTo.getName() : "remove it"));
 		}
 		if (mark == Signal.TO_DATA && kind == Kind.ENUM) {
 			return new CodeAnalysisException(String.format("%s %s, but implements ToData, which nothing reads: remove "

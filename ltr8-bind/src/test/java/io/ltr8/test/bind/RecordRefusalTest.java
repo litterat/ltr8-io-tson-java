@@ -258,8 +258,8 @@ class RecordRefusalTest {
 		assertAll(Stream.of(OrderedTuple.class, OrderedTupleNamingNothing.class).map(type -> () -> {
 			DataBindException refused = refusal(context, type);
 			assertInstanceOf(CodeAnalysisException.class, refused, type.getName());
-			assertEquals(type.getName() + " carries @FieldOrder, but is a @Tuple, whose elements are its record "
-					+ "components in declared order; " + ORDER_DOES_NOT_APPLY, refused.getMessage());
+			assertEquals(type.getName() + " carries @FieldOrder, but is a @Tuple, written as its components by "
+					+ "position; " + ORDER_DOES_NOT_APPLY + ", so remove it", refused.getMessage());
 			assertNull(refused.getCause());
 		}));
 	}
@@ -269,7 +269,7 @@ class RecordRefusalTest {
 		assertAll(Stream.of(OrderedTransparent.class, OrderedTransparentNamingNothing.class).map(type -> () -> {
 			DataBindException refused = refusal(context, type);
 			assertEquals(type.getName() + " carries @FieldOrder, but is @Transparent, written as its one component; "
-					+ ORDER_DOES_NOT_APPLY, refused.getMessage());
+					+ ORDER_DOES_NOT_APPLY + ", so remove it", refused.getMessage());
 			assertNull(refused.getCause());
 		}));
 	}

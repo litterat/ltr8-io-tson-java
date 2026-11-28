@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.ltr8.annotation.Atom;
+import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
@@ -247,5 +248,46 @@ public final class KindConflicts {
 	@Record
 	public enum RecordEnum {
 		ONE
+	}
+
+	// --- an order on a kind that has no components of its own
+
+	@FieldOrder({})
+	public enum OrderedEnum {
+		ONE
+	}
+
+	@FieldOrder({})
+	public sealed interface OrderedUnion permits OrderedUnionMember {
+	}
+
+	public record OrderedUnionMember(String value) implements OrderedUnion {
+	}
+
+	@FieldOrder({ "value" })
+	public static final class OrderedAtom {
+		private final String value;
+
+		@Atom
+		public OrderedAtom(String value) {
+			this.value = value;
+		}
+
+		@Atom
+		public String value() {
+			return value;
+		}
+	}
+
+	@FieldOrder({})
+	public static class OrderedMap extends HashMap<String, String> {
+	}
+
+	@FieldOrder({})
+	public static class OrderedList extends ArrayList<String> {
+	}
+
+	@FieldOrder({ "value" })
+	public record OrderedRecord(String value) {
 	}
 }

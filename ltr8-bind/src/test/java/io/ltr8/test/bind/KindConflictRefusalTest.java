@@ -16,6 +16,7 @@
 package io.ltr8.test.bind;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.test.data.KindConflicts.AbstractRecord;
 import io.ltr8.test.data.KindConflicts.AbstractRecordConstructor;
 import io.ltr8.test.data.KindConflicts.AbstractRecordUnion;
@@ -26,6 +27,12 @@ import io.ltr8.test.data.KindConflicts.EnumToData;
 import io.ltr8.test.data.KindConflicts.EnumUnion;
 import io.ltr8.test.data.KindConflicts.RecordUnion;
 import io.ltr8.test.data.KindConflicts.ToDataUnion;
+import io.ltr8.test.data.KindConflicts.OrderedAtom;
+import io.ltr8.test.data.KindConflicts.OrderedEnum;
+import io.ltr8.test.data.KindConflicts.OrderedList;
+import io.ltr8.test.data.KindConflicts.OrderedMap;
+import io.ltr8.test.data.KindConflicts.OrderedRecord;
+import io.ltr8.test.data.KindConflicts.OrderedUnion;
 import io.ltr8.test.data.KindConflicts.RecordConstructorToData;
 import io.ltr8.test.data.KindConflicts.RecordEnum;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
@@ -48,6 +55,7 @@ import io.ltr8.test.data.KindConflicts.TupleToData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -103,8 +111,8 @@ class KindConflictRefusalTest {
 				described(EnumUnion.class, "carries @Union, but is an enum, written as its constant's name" + belongs),
 				described(AtomUnion.class, "carries @Union, but is an atom, written as the value its way out returns"
 						+ belongs),
-				registered(AtomUnion.class, "carries @Union, but is an atom, written as the value its way out returns"
-						+ belongs),
+				registered(AtomUnion.class, "carries @Union, but is registered as an atom, written as the value its way "
+						+ "out returns" + belongs),
 				registered(EnumUnion.class, "carries @Union, but is an enum, written as its constant's name"
 						+ belongs),
 				described(ConcreteUnion.class, "carries @Union, but is a concrete class" + belongs),
@@ -171,10 +179,36 @@ class KindConflictRefusalTest {
 						+ "remove it"));
 	}
 
+	@Test
+	void anOrderOnAKindWithNoComponentsOfItsOwnIsRefused() {
+		String order = "; an order applies only to a class described by its own components, so remove it";
+		assertAll(
+				described(OrderedEnum.class, "carries @FieldOrder, but is an enum, written as its constant's name"
+						+ order),
+				registered(OrderedEnum.class, "carries @FieldOrder, but is an enum, written as its constant's name"
+						+ order),
+				described(OrderedUnion.class, "carries @FieldOrder, but is a union, written as one of its members"
+						+ order),
+				described(OrderedAtom.class, "carries @FieldOrder, but is an atom, written as the value its way out "
+						+ "returns" + order),
+				registered(OrderedAtom.class, "carries @FieldOrder, but is registered as an atom, written as the value "
+						+ "its way out returns" + order),
+				described(new DataParameterizedType(OrderedMap.class, String.class, String.class), OrderedMap.class,
+						"carries @FieldOrder, but is a map, written as its entries" + order),
+				described(new DataParameterizedType(OrderedList.class, String.class), OrderedList.class,
+						"carries @FieldOrder, but is a collection, written as its elements" + order),
+				registered(OrderedRecord.class, "carries @FieldOrder, but is registered as an atom with no form of its "
+						+ "own" + order));
+	}
+
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */
 	private static Executable described(Class<?> type, String refusal) {
+		return described(type, type, refusal);
+	}
+
+	private static Executable described(Type at, Class<?> type, String refusal) {
 		return () -> assertAll(Stream.of(1, 2).<Executable>map(run -> () -> assertEquals(
-				List.of(type.getName() + " " + refusal), messages(type), type.getSimpleName())));
+				List.of(type.getName() + " " + refusal), messages(at, type), type.getSimpleName())));
 	}
 
 	/** Registered as an atom, {@code type}'s name and {@code refusal} are the message of the refusal it causes. */
@@ -187,14 +221,14 @@ class KindConflictRefusalTest {
 		};
 	}
 
-	private static List<String> messages(Class<?> type) {
+	private static List<String> messages(Type at, Class<?> type) {
 		List<String> messages = new ArrayList<>();
 		try {
-			DataBindContext.builder().build().getDescriptor(type);
+			DataBindContext.builder().build().getDescriptor(type, at);
 			messages.add("described");
 		} catch (Exception e) {
-			for (Throwable at = e; at != null; at = at.getCause()) {
-				messages.add(at.getMessage());
+			for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+				messages.add(cause.getMessage());
 			}
 		}
 		return messages;
