@@ -56,6 +56,9 @@ module io.ltr8.tson.json {
     // a dependency on `tson-compiler`: what crosses from the schema pipeline is its output, never its engine.
     requires transitive io.ltr8.tson.schema;
 
+    // Which host class each entry binds to: one implementation, which `tson-compiler` builds its readers on too.
+    requires transitive io.ltr8.tson.encoding;
+
     // `@Typename`, read off a resolved body to learn which constructor it is an instance of.
     requires io.ltr8.annotation;
 }
