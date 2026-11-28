@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.ltr8.annotation.Atom;
+import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
@@ -289,5 +290,19 @@ public final class KindConflicts {
 
 	@FieldOrder({ "value" })
 	public record OrderedRecord(String value) {
+	}
+
+	/** Registers {@link TupleRecord} as an atom of its one value, setting its marks aside. */
+	public static final class TupleRecordAsText implements DataBridge<String, TupleRecord> {
+
+		@Override
+		public String toData(TupleRecord object) {
+			return object.value();
+		}
+
+		@Override
+		public TupleRecord toObject(String data) {
+			return new TupleRecord(data);
+		}
 	}
 }

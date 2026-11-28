@@ -16,6 +16,8 @@
 package io.ltr8.test.bind;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.test.data.KindConflicts.AbstractRecord;
 import io.ltr8.test.data.KindConflicts.AbstractRecordConstructor;
@@ -51,6 +53,7 @@ import io.ltr8.test.data.KindConflicts.TransparentRecordConstructor;
 import io.ltr8.test.data.KindConflicts.TransparentToData;
 import io.ltr8.test.data.KindConflicts.TransparentTuple;
 import io.ltr8.test.data.KindConflicts.TupleRecord;
+import io.ltr8.test.data.KindConflicts.TupleRecordAsText;
 import io.ltr8.test.data.KindConflicts.TupleToData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -62,6 +65,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -199,6 +203,27 @@ class KindConflictRefusalTest {
 						"carries @FieldOrder, but is a collection, written as its elements" + order),
 				registered(OrderedRecord.class, "carries @FieldOrder, but is registered as an atom with no form of its "
 						+ "own" + order));
+	}
+
+	/** Registered with no bridge, a class is read, and a mark its atom form does not read refuses it. */
+	@Test
+	void aBareRegistrationRefusesAMarkItsAtomFormDoesNotRead() {
+		String bare = "is registered as an atom with no form of its own, so nothing reads ";
+		assertAll(
+				registered(TupleRecord.class, bare + "@Tuple: remove it, or describe TupleRecord rather than register "
+						+ "it as an atom"),
+				registered(RecordToData.class, bare + "@Record: remove it, or describe RecordToData rather than "
+						+ "register it as an atom"),
+				registered(ToDataUnion.class, bare + "@Union: remove it, or describe ToDataUnion rather than register "
+						+ "it as an atom"));
+	}
+
+	/** Registered with a bridge, the bridge is the atom's form, and the class's own marks are set aside. */
+	@Test
+	void aBridgedRegistrationSetsTheClassesMarksAside() throws DataBindException {
+		DataClassAtom atom = assertInstanceOf(DataClassAtom.class, DataBindContext.builder()
+				.registerAtom(TupleRecord.class, new TupleRecordAsText()).build().getDescriptor(TupleRecord.class));
+		assertEquals(String.class, atom.dataClass());
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

@@ -109,10 +109,11 @@ final class KindMarks {
 		RESOLVED.put(Kind.NONE, reading(but(all, Signal.UNION), Set.of()));
 
 		REGISTERED.put(Kind.ENUM, RESOLVED.get(Kind.ENUM));
-		// An interface or abstract class registered as an atom is a union where it is described.
-		REGISTERED.put(Kind.ATOM, reading(but(all, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
-				Walk.INHERITED_WAY_IN));
-		REGISTERED.put(Kind.NONE, reading(but(all, Signal.FIELD_ORDER), Set.of()));
+		Set<Signal> atomForm = EnumSet.copyOf(ATOM_SIGNALS);
+		atomForm.add(Signal.TO_DATA);
+		REGISTERED.put(Kind.ATOM, reading(atomForm, Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
+		// A way out marked with no way in is its binder's to refuse, naming the way in it lacks.
+		REGISTERED.put(Kind.NONE, reading(Set.of(Signal.ATOM_ON_INSTANCE_METHOD), Set.of()));
 		if (!RESOLVED.keySet().containsAll(EnumSet.allOf(Kind.class))) {
 			throw new IllegalStateException("A kind has no reading: " + RESOLVED.keySet());
 		}
@@ -167,12 +168,12 @@ final class KindMarks {
 						+ "as the value its way out returns" : written(kind, signals, null, bridgedTo);
 		// Whichever entry point describes it, nothing makes a concrete class a union by its mark.
 		if (signals.has(Signal.UNION) && !signals.has(Signal.ABSTRACT) && !signals.has(Signal.SEALED)) {
-			throw unread(kind, signals, Signal.UNION, written, bridgedTo);
+			throw unread(entry, kind, signals, Signal.UNION, written, bridgedTo);
 		}
 		for (Signal mark : MARKS) {
 			if (signals.has(mark) && !reading.marks().contains(mark)
 					&& !(ATOM_SIGNALS.contains(mark) && reading.walks().contains(Walk.ATOM))) {
-				throw unread(kind, signals, mark, written, bridgedTo);
+				throw unread(entry, kind, signals, mark, written, bridgedTo);
 			}
 		}
 		Union union = signals.union();
@@ -267,9 +268,15 @@ final class KindMarks {
 						: "make " + type.getSimpleName() + " concrete, or remove it"));
 	}
 
-	private static DataBindException unread(Kind kind, ClassSignals signals, Signal mark, String written,
+	private static DataBindException unread(Entry entry, Kind kind, ClassSignals signals, Signal mark, String written,
 			Class<?> bridgedTo) {
 		Class<?> type = signals.type();
+		if (entry == Entry.REGISTER_ATOM && kind != Kind.ENUM && mark != Signal.FIELD_ORDER
+				&& (mark != Signal.UNION || signals.has(Signal.ABSTRACT))) {
+			return new CodeAnalysisException(String.format("%s %s, so nothing reads %s: remove it, or describe %s "
+					+ "rather than register it as an atom", type.getName(), written, label(mark, type),
+					type.getSimpleName()));
+		}
 		Signal own = ownWay(kind, signals);
 		if (own != null && WAYS.containsKey(mark)) {
 			return new CodeAnalysisException(String.format("%s says two ways to write it, %s, %s, and %s, %s: remove one "

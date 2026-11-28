@@ -25,7 +25,9 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
   refused (`IgnoredAnnotationRefusalTest`); a component's members merge `@Field` by attribute and must agree
   (`ComponentAnnotationPrecedenceTest`).
 - What each kind reads of a class, its class-level marks and the walks over its members, is one table, `KindMarks`,
-  applied for every kind of either entry point; a binder runs no walk of its own.
+  applied for every kind of either entry point; a binder runs no walk of its own (`KindConflictRefusalTest`).
+- `registerAtom(Class)` judges the class like describing it, refusing a mark its atom form does not read;
+  `registerAtom(Class, bridge)` is an override, and sets the class's marks aside unread.
 - A `@Field` bridge or a registered atom's, unlike a `ToData` class, may inherit `DataBridge<D, O>`; both arguments
   must resolve to classes, and a registered atom's `O` is the atom's class (`BridgedFieldTest`, `RecordRefusalTest`,
   `AtomBridgeRegistrationTest`).
