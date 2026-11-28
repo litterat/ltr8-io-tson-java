@@ -85,23 +85,24 @@ final class KindMarks {
 		Set<Signal> all = MARKS;
 		RESOLVED.put(Kind.ANNOTATED, reading(all, Set.of()));
 		RESOLVED.put(Kind.TRANSPARENT, reading(but(all, Signal.TUPLE, Signal.RECORD_ON_TYPE,
-				Signal.RECORD_ON_CONSTRUCTOR, Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD),
-				Walk.ANY));
-		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.TO_DATA,
-				Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
-		RESOLVED.put(Kind.RECORD, reading(all, Set.of(), Set.of(Signal.INTERFACE, Signal.ABSTRACT),
+				Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION, Signal.TO_DATA, Signal.FIELD_ORDER),
+				Set.of(Signal.JDK_RECORD), Walk.ANY));
+		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
+				Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
+		RESOLVED.put(Kind.RECORD, reading(but(all, Signal.UNION), Set.of(), Set.of(Signal.INTERFACE, Signal.ABSTRACT),
 				Walk.INHERITED_WAY_IN));
-		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM,
-				Walk.BRIDGED_RECORD));
-		RESOLVED.put(Kind.ENUM, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
+				Walk.ATOM, Walk.BRIDGED_RECORD));
+		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.ATOM, reading(all, Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
+		RESOLVED.put(Kind.ATOM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
 		RESOLVED.put(Kind.MAP, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.ARRAY, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.NONE, reading(all, Set.of()));
+		RESOLVED.put(Kind.NONE, reading(but(all, Signal.UNION), Set.of()));
 
 		REGISTERED.put(Kind.ENUM, RESOLVED.get(Kind.ENUM));
-		REGISTERED.put(Kind.ATOM, RESOLVED.get(Kind.ATOM));
+		// An interface or abstract class registered as an atom is a union where it is described.
+		REGISTERED.put(Kind.ATOM, reading(all, Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
 		REGISTERED.put(Kind.NONE, reading(all, Set.of()));
 		if (!RESOLVED.keySet().containsAll(EnumSet.allOf(Kind.class))) {
 			throw new IllegalStateException("A kind has no reading: " + RESOLVED.keySet());
@@ -153,6 +154,10 @@ final class KindMarks {
 		}
 		Class<?> bridgedTo = kind == Kind.BRIDGED ? ToDataBridges.findToDataClass(signals.type()) : null;
 		String written = written(kind, signals, null, bridgedTo);
+		// Whichever entry point describes it, nothing makes a concrete class a union by its mark.
+		if (signals.has(Signal.UNION) && !signals.has(Signal.ABSTRACT) && !signals.has(Signal.SEALED)) {
+			throw unread(kind, signals, Signal.UNION, written, bridgedTo);
+		}
 		for (Signal mark : MARKS) {
 			if (signals.has(mark) && !reading.marks().contains(mark)
 					&& !(ATOM_SIGNALS.contains(mark) && reading.walks().contains(Walk.ATOM))) {
@@ -248,6 +253,15 @@ final class KindMarks {
 		if (own != null && WAYS.containsKey(mark)) {
 			return new CodeAnalysisException(String.format("%s says two ways to write it, %s, %s, and %s, %s: remove one "
 					+ "of them", type.getName(), label(own, type), WAYS.get(own), label(mark, type), WAYS.get(mark)));
+		}
+		if (mark == Signal.UNION) {
+			if (kind == Kind.BRIDGED && signals.has(Signal.ABSTRACT)) {
+				return new CodeAnalysisException(String.format("%s carries @Union, a union of its members, but "
+						+ "implements ToData, bridged to the record class it names: remove one of them", type.getName()));
+			}
+			return new CodeAnalysisException(String.format("%s carries @Union, but %s; @Union belongs on an interface "
+					+ "or abstract class, written as one of its members: remove it", type.getName(),
+					kind == Kind.NONE ? "is a concrete class" : written));
 		}
 		if (mark == Signal.FIELD_ORDER) {
 			return switch (kind) {

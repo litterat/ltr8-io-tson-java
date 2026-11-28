@@ -15,6 +15,7 @@
  */
 package io.ltr8.test.data;
 
+import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
@@ -104,5 +105,39 @@ public final class KindConflicts {
 
 	@Record
 	public interface RecordInterface {
+	}
+
+	// --- a union mark on a class that is not one
+
+	@Union
+	public record RecordUnion(String value) {
+	}
+
+	@Union
+	public enum EnumUnion {
+		ONE
+	}
+
+	@Union
+	public static final class AtomUnion {
+		private final String value;
+
+		@Atom
+		public AtomUnion(String value) {
+			this.value = value;
+		}
+
+		@Atom
+		public String value() {
+			return value;
+		}
+	}
+
+	@Union
+	public static class ConcreteUnion {
+	}
+
+	@Union
+	public interface ToDataUnion extends ToData<Text> {
 	}
 }

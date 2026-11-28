@@ -19,6 +19,11 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.test.data.KindConflicts.AbstractRecord;
 import io.ltr8.test.data.KindConflicts.AbstractRecordConstructor;
 import io.ltr8.test.data.KindConflicts.AbstractRecordUnion;
+import io.ltr8.test.data.KindConflicts.AtomUnion;
+import io.ltr8.test.data.KindConflicts.ConcreteUnion;
+import io.ltr8.test.data.KindConflicts.EnumUnion;
+import io.ltr8.test.data.KindConflicts.RecordUnion;
+import io.ltr8.test.data.KindConflicts.ToDataUnion;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
 import io.ltr8.test.data.KindConflicts.SealedAbstractRecord;
 import io.ltr8.test.data.KindConflicts.TransparentRecord;
@@ -36,6 +41,8 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** A class whose marks say two kinds, or carry a mark its kind never reads, is refused with the fix named. */
 class KindConflictRefusalTest {
@@ -75,10 +82,37 @@ class KindConflictRefusalTest {
 						+ built + "remove it"));
 	}
 
+	@Test
+	void aUnionMarkOnAClassThatIsNoUnionIsRefused() {
+		String belongs = "; @Union belongs on an interface or abstract class, written as one of its members: remove it";
+		assertAll(
+				described(RecordUnion.class, "carries @Union, but is a record, written as its components" + belongs),
+				described(EnumUnion.class, "carries @Union, but is an enum, written as its constant's name" + belongs),
+				described(AtomUnion.class, "carries @Union, but is an atom, written as the value its way out returns"
+						+ belongs),
+				registered(AtomUnion.class, "carries @Union, but is an atom, written as the value its way out returns"
+						+ belongs),
+				registered(EnumUnion.class, "carries @Union, but is an enum, written as its constant's name"
+						+ belongs),
+				described(ConcreteUnion.class, "carries @Union, but is a concrete class" + belongs),
+				described(ToDataUnion.class, "carries @Union, a union of its members, but implements ToData, bridged "
+						+ "to the record class it names: remove one of them"));
+	}
+
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */
 	private static Executable described(Class<?> type, String refusal) {
 		return () -> assertAll(Stream.of(1, 2).<Executable>map(run -> () -> assertEquals(
 				List.of(type.getName() + " " + refusal), messages(type), type.getSimpleName())));
+	}
+
+	/** Registered as an atom, {@code type}'s name and {@code refusal} are the message of the refusal it causes. */
+	private static Executable registered(Class<?> type, String refusal) {
+		return () -> {
+			IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+					() -> DataBindContext.builder().registerAtom(type).build(), type.getSimpleName());
+			assertEquals(type.getName() + " " + refusal, thrown.getCause().getMessage(), type.getSimpleName());
+			assertNull(thrown.getCause().getCause(), type.getSimpleName());
+		};
 	}
 
 	private static List<String> messages(Class<?> type) {
