@@ -1306,7 +1306,6 @@ class TsonObjectReaderTest {
 
     // ── Unions ───────────────────────────────────────────────────────────
 
-    @Union({ Circle.class, Rectangle.class })
     public sealed interface Shape permits Circle, Rectangle {
     }
 
@@ -1336,7 +1335,6 @@ class TsonObjectReaderTest {
     public record Square(int side) implements NamedShape {
     }
 
-    @Union({ Square.class })
     public sealed interface NamedShape permits Square {
     }
 

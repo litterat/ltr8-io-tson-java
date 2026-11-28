@@ -30,7 +30,9 @@ import java.lang.annotation.Target;
  * record class into positional, array-shaped binding instead.
  *
  * <p>Only a genuine Java {@code record} may carry this annotation for now -- not a hand-written
- * immutable class the way {@code @Record} allows. This mirrors the kernel's own {@code tuple}
+ * immutable class the way {@code @Record} allows. Beside {@code @Record}, {@link Transparent} or {@link ToData}, each
+ * another way to write the record, or with {@link FieldOrder}, {@link Union}, or {@link Atom} on the record or a
+ * member of its own, none of which it reads, the record is refused. This mirrors the kernel's own {@code tuple}
  * constructor ({@code ~product & { access_pattern: INDEX, size_type: FIXED, elements: [...] } }),
  * ahead of the Part 2 schema work that will eventually let a schema declare this instead of a Java
  * annotation declaring it.

@@ -156,10 +156,10 @@ class OpenUnionMembershipTest {
 	}
 
 	@Test
-	void aClassExtendingAUnionDescribedAsARecordIsStillDescribed() throws DataBindException {
+	void aClassExtendingAUnionThisContextRefusesIsStillDescribed() throws DataBindException {
 		DataBindContext context = DataBindContext.builder().build();
 		assertInstanceOf(DataClassRecord.class, context.getDescriptor(OfRecordShapedUnion.class));
-		assertInstanceOf(DataClassRecord.class, context.getDescriptor(RecordShapedUnion.class));
+		assertThrows(DataBindException.class, () -> context.getDescriptor(RecordShapedUnion.class));
 	}
 
 	@Test

@@ -15,17 +15,21 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
 - A refusal's own `getMessage()` is the fact: a `DataBindException` raised while describing a class passes up
   unwrapped, however deep the class sits (`RecordRefusalTest`).
 - A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`
-  (`ToDataBridgeTest`).
+  (`ToDataBridgeTest`); `S` is described as any class is, and must be a record by its own components
+  (`KindConflictRefusalTest`).
 - An atom says its way in, `@Atom` on one public constructor or static method of its own, and its way out, `@Atom` on
   one public instance method or `ToData<S>`, possibly inherited; nothing is found by name, and the halves carry one
   value up to boxing. A `ToData` class marking no `@Atom` is a bridged class (`AtomFormTest`). `@Atom` on a class
   described as anything else, or on a super class's static method, refuses the class (`UnreadAtomRefusalTest`), save
-  on a record, where only `registerAtom` reads it, and on an instance method a class described as an atom may inherit.
+  on an instance method a class described as an atom may inherit; on a record, described or registered bare, it is a
+  second way to write it, refused naming `registerAtom(Class, bridge)` as a record's atom form (`AtomFormTest`).
 - A binding annotation is never silently ignored: `@Field`, `@Union` or `@Unbound` is applied, or the class is
   refused (`IgnoredAnnotationRefusalTest`); a component's members merge `@Field` by attribute and must agree
   (`ComponentAnnotationPrecedenceTest`).
 - What each kind reads of a class, its class-level marks and the walks over its members, is one table, `KindMarks`,
-  applied for every kind of either entry point; a binder runs no walk of its own.
+  applied for every kind of either entry point; a binder runs no walk of its own (`KindConflictRefusalTest`).
+- `registerAtom(Class)` judges the class like describing it, refusing a mark its atom form does not read;
+  `registerAtom(Class, bridge)` is an override, and sets the class's marks aside unread.
 - A `@Field` bridge or a registered atom's, unlike a `ToData` class, may inherit `DataBridge<D, O>`; both arguments
   must resolve to classes, and a registered atom's `O` is the atom's class (`BridgedFieldTest`, `RecordRefusalTest`,
   `AtomBridgeRegistrationTest`).

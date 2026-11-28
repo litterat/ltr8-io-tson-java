@@ -634,7 +634,7 @@ final class ComponentAnnotations {
 				describe(givenBy)));
 	}
 
-	private static String show(Union union) {
+	static String show(Union union) {
 		String members = Arrays.stream(union.value()).map(member -> member.getName() + ".class")
 				.collect(Collectors.joining(", ", "{", "}"));
 		return union.sealed() ? "@Union(" + members + ")" : "@Union(value = " + members + ", sealed = false)";

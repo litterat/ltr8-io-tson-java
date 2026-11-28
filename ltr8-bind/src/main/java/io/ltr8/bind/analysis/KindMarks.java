@@ -15,15 +15,31 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.Atom;
+import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAtom;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.analysis.ClassSignals.Signal;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * What each {@link Kind} reads of a class: the class-level marks it consumes, and the walks over the class's members
@@ -52,22 +68,21 @@ final class KindMarks {
 		/** {@link ComponentAnnotations#refuseAtom}, which judges every {@code @Atom} mark. */
 		ATOM,
 		/** {@link ComponentAnnotations#refuseInheritedWayIn}. */
-		INHERITED_WAY_IN,
-		/** {@link Kind#RECORD}'s walks, over the record class a bridged class names, which describes it. */
-		BRIDGED_RECORD
+		INHERITED_WAY_IN
 	}
 
 	/**
-	 * What a kind reads: the {@link #MARKS} it consumes, the JDK facts it needs, and its walks. A kind running
-	 * {@link Walk#ATOM} judges the {@code @Atom} marks there.
+	 * What a kind reads: the {@link #MARKS} it consumes, the JDK facts it needs and those it cannot describe, and its
+	 * walks. A kind running {@link Walk#ATOM} judges the {@code @Atom} marks there.
 	 */
-	private record Reading(Set<Signal> marks, Set<Signal> needs, List<Walk> walks) {
+	private record Reading(Set<Signal> marks, Set<Signal> needs, Set<Signal> excludes, List<Walk> walks) {
 	}
 
 	/** The signals an author writes on a class, rather than facts the JDK reports of it. */
 	private static final Set<Signal> MARKS = EnumSet.of(Signal.TRANSPARENT, Signal.TUPLE, Signal.RECORD_ON_TYPE,
-			Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION, Signal.ATOM_ON_TYPE, Signal.ATOM_ON_CONSTRUCTOR,
-			Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD, Signal.TO_DATA, Signal.FIELD_ORDER);
+			Signal.RECORD_ON_CONSTRUCTOR, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR, Signal.UNION, Signal.ATOM_ON_TYPE,
+			Signal.ATOM_ON_CONSTRUCTOR, Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD, Signal.TO_DATA,
+			Signal.FIELD_ORDER);
 
 	private static final Set<Signal> ATOM_SIGNALS = EnumSet.of(Signal.ATOM_ON_TYPE, Signal.ATOM_ON_CONSTRUCTOR,
 			Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD);
@@ -77,23 +92,35 @@ final class KindMarks {
 	private static final Map<Kind, Reading> REGISTERED = new EnumMap<>(Kind.class);
 
 	static {
-		Set<Signal> all = MARKS;
+		// No kind reads @Record on a constructor nothing can build the class through.
+		Set<Signal> all = but(MARKS, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR);
 		RESOLVED.put(Kind.ANNOTATED, reading(all, Set.of()));
-		RESOLVED.put(Kind.TRANSPARENT, reading(but(all, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
-		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
-		RESOLVED.put(Kind.RECORD, reading(all, Set.of(), Walk.INHERITED_WAY_IN));
-		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM,
-				Walk.BRIDGED_RECORD));
-		RESOLVED.put(Kind.ENUM, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.ATOM, reading(all, Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
-		RESOLVED.put(Kind.MAP, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.ARRAY, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.NONE, reading(all, Set.of()));
+		RESOLVED.put(Kind.TRANSPARENT, reading(but(all, Signal.TUPLE, Signal.RECORD_ON_TYPE,
+				Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION, Signal.TO_DATA, Signal.FIELD_ORDER),
+				Set.of(Signal.JDK_RECORD), Walk.ANY));
+		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
+				Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
+		RESOLVED.put(Kind.RECORD, reading(but(all, Signal.UNION), Set.of(), Set.of(Signal.INTERFACE, Signal.ABSTRACT),
+				Walk.INHERITED_WAY_IN));
+		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
+				Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
+				Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.UNION, reading(but(all, Signal.FIELD_ORDER), Set.of(), Set.of(Signal.MAP, Signal.COLLECTION),
+				Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ATOM, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
+				Walk.INHERITED_WAY_IN));
+		RESOLVED.put(Kind.MAP, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ARRAY, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
+				Walk.ATOM));
+		RESOLVED.put(Kind.NONE, reading(but(all, Signal.UNION), Set.of()));
 
 		REGISTERED.put(Kind.ENUM, RESOLVED.get(Kind.ENUM));
-		REGISTERED.put(Kind.ATOM, RESOLVED.get(Kind.ATOM));
-		REGISTERED.put(Kind.NONE, reading(all, Set.of()));
+		Set<Signal> atomForm = EnumSet.copyOf(ATOM_SIGNALS);
+		atomForm.add(Signal.TO_DATA);
+		REGISTERED.put(Kind.ATOM, reading(atomForm, Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
+		// A way out marked with no way in is its binder's to refuse, naming the way in it lacks.
+		REGISTERED.put(Kind.NONE, reading(Set.of(Signal.ATOM_ON_INSTANCE_METHOD), Set.of()));
 		if (!RESOLVED.keySet().containsAll(EnumSet.allOf(Kind.class))) {
 			throw new IllegalStateException("A kind has no reading: " + RESOLVED.keySet());
 		}
@@ -103,7 +130,11 @@ final class KindMarks {
 	}
 
 	private static Reading reading(Set<Signal> marks, Set<Signal> needs, Walk... walks) {
-		return new Reading(Set.copyOf(marks), needs, List.of(walks));
+		return reading(marks, needs, Set.of(), walks);
+	}
+
+	private static Reading reading(Set<Signal> marks, Set<Signal> needs, Set<Signal> excludes, Walk... walks) {
+		return new Reading(Set.copyOf(marks), needs, excludes, List.of(walks));
 	}
 
 	private static Set<Signal> but(Set<Signal> marks, Signal... unread) {
@@ -133,13 +164,32 @@ final class KindMarks {
 				throw unmet(kind, signals);
 			}
 		}
+		for (Signal excluded : reading.excludes()) {
+			if (signals.has(excluded)) {
+				throw excluded(kind, signals);
+			}
+		}
 		Class<?> bridgedTo = kind == Kind.BRIDGED ? ToDataBridges.findToDataClass(signals.type()) : null;
-		String written = written(kind, signals, null, bridgedTo);
+		String written = entry == Entry.REGISTER_ATOM && kind == Kind.NONE ? "is registered as an atom with no form "
+				+ "of its own" : entry == Entry.REGISTER_ATOM && kind == Kind.ATOM ? "is registered as an atom, written "
+						+ "as the value its way out returns" : written(kind, signals, null, bridgedTo);
+		// Whichever entry point describes it, nothing makes a concrete class a union by its mark.
+		if (signals.has(Signal.UNION) && !signals.has(Signal.ABSTRACT) && !signals.has(Signal.SEALED)) {
+			throw unread(entry, kind, signals, Signal.UNION, written, bridgedTo);
+		}
+		refuseRecordAtom(entry, kind, signals, written);
 		for (Signal mark : MARKS) {
 			if (signals.has(mark) && !reading.marks().contains(mark)
 					&& !(ATOM_SIGNALS.contains(mark) && reading.walks().contains(Walk.ATOM))) {
-				throw unread(kind, signals, mark, written, bridgedTo);
+				throw unread(entry, kind, signals, mark, written, bridgedTo);
 			}
+		}
+		Union union = signals.union();
+		if (kind == Kind.UNION && signals.has(Signal.SEALED) && union != null
+				&& (union.value().length > 0 || !union.sealed())) {
+			throw new CodeAnalysisException(String.format("%s is sealed, so its members are the classes it permits, but "
+					+ "carries %s: the members come from permits, so remove its attributes", signals.type().getName(),
+					ComponentAnnotations.show(union)));
 		}
 		boolean walkedAfter = kind == Kind.RECORD || kind == Kind.ATOM;
 		if (!walkedAfter) {
@@ -166,12 +216,34 @@ final class KindMarks {
 			case UNREAD -> ComponentAnnotations.refuseUnread(type, written);
 			case ATOM -> ComponentAnnotations.refuseAtom(type, written);
 			case INHERITED_WAY_IN -> ComponentAnnotations.refuseInheritedWayIn(type, written);
-			case BRIDGED_RECORD -> {
-				for (Walk recordWalk : RESOLVED.get(Kind.RECORD).walks()) {
-					walk(recordWalk, bridgedTo, written(Kind.RECORD, ClassSignals.of(bridgedTo), null, null), null);
-				}
-			}
 		}
+	}
+
+	/**
+	 * Refuses {@code bridged}, whose {@code ToData} names {@code described}'s class, where that class is described as
+	 * anything but a record by its own components: the bridge writes {@code bridged} as one.
+	 */
+	static void refuseBridgedTo(Class<?> bridged, DataClass described) throws DataBindException {
+		if (described instanceof DataClassRecord record && record.bridge().isEmpty()) {
+			return;
+		}
+		Class<?> named = described.typeClass();
+		ClassSignals signals = ClassSignals.of(named);
+		Kind kind = signals.kind();
+		Class<?> bridgedTo = kind == Kind.BRIDGED ? ToDataBridges.findToDataClass(named) : null;
+		// A registered or core atom is described as one whatever its own signals say.
+		boolean registered = described instanceof DataClassAtom && kind != Kind.ATOM && kind != Kind.ENUM
+				&& kind != Kind.TRANSPARENT;
+		String fix = registered ? "a class written as " + named.getSimpleName() + " is an atom, and marks its way in "
+				+ "@Atom" : switch (kind) {
+			case TRANSPARENT -> "remove @Transparent from " + named.getSimpleName();
+			case TUPLE -> "remove @Tuple from " + named.getSimpleName();
+			case BRIDGED -> "name " + bridgedTo.getName() + " in its place";
+			default -> "name such a class in its place";
+		};
+		throw new CodeAnalysisException(String.format("%s implements ToData<%s>, but %s %s; ToData names a record class "
+				+ "described by its own components: %s", bridged.getName(), named.getSimpleName(), named.getName(),
+				registered ? "is an atom" : written(kind, signals, described, bridgedTo), fix));
 	}
 
 	/** How {@code kind} writes {@code signals}' class, completing "{@code type} ...". */
@@ -202,22 +274,180 @@ final class KindMarks {
 		};
 	}
 
-	private static DataBindException unread(Kind kind, ClassSignals signals, Signal mark, String written,
+	/** The facts and marks that make a class a record of one kind or another, a JDK record or a marked class. */
+	private static final Set<Signal> RECORD_FAMILY = EnumSet.of(Signal.JDK_RECORD, Signal.RECORD_ON_TYPE,
+			Signal.RECORD_ON_CONSTRUCTOR, Signal.TUPLE, Signal.TRANSPARENT);
+
+	/**
+	 * Refuses a record that carries {@code @Atom} on itself, a constructor or a method of its own, which says it is an
+	 * atom too: a record is written one way, and its atom form, where it has one, is a registered bridge. Its kinds
+	 * read the {@code @Atom} marks, so that this names the fix; a record's inherited instance method is its super
+	 * class's to judge.
+	 */
+	private static void refuseRecordAtom(Entry entry, Kind kind, ClassSignals signals, String written)
+			throws DataBindException {
+		boolean judged = entry == Entry.RESOLVE
+				? kind == Kind.RECORD || kind == Kind.TUPLE || kind == Kind.TRANSPARENT
+				: kind == Kind.ATOM || kind == Kind.NONE;
+		if (!judged || Collections.disjoint(signals.present(), RECORD_FAMILY)) {
+			return;
+		}
+		Class<?> type = signals.type();
+		List<AnnotatedElement> marked = new ArrayList<>();
+		if (type.isAnnotationPresent(Atom.class)) {
+			marked.add(type);
+		}
+		Stream.of(type.getDeclaredConstructors()).filter(constructor -> constructor.isAnnotationPresent(Atom.class))
+				.forEach(marked::add);
+		Stream.of(type.getDeclaredMethods()).filter(method -> !method.isBridge() && !method.isSynthetic()
+				&& method.isAnnotationPresent(Atom.class)).sorted(Comparator.comparing(Method::toString))
+				.forEach(marked::add);
+		if (marked.isEmpty()) {
+			return;
+		}
+		String member = switch (marked.getFirst()) {
+			case Class<?> marks -> "the " + (marks.isInterface() ? "interface " : "class ") + marks.getSimpleName();
+			case Constructor<?> constructor -> "the constructor " + type.getSimpleName() + parameters(constructor);
+			case Method method -> "the method " + type.getSimpleName() + "." + method.getName() + parameters(method);
+			default -> throw new IllegalStateException(marked.getFirst() + " is no class, constructor or method");
+		};
+		String fix = "remove it; an atom form for a record comes from registerAtom(" + type.getSimpleName()
+				+ ".class, bridge)";
+		throw new CodeAnalysisException(entry == Entry.RESOLVE
+				? String.format("%s %s, but carries @Atom on %s, which says it is an atom: %s", type.getName(),
+						written, member, fix)
+				: String.format("%s is registered as an atom, but is a record, whose @Atom on %s nothing reads: %s",
+						type.getName(), member, fix));
+	}
+
+	private static DataBindException excluded(Kind kind, ClassSignals signals) {
+		Class<?> type = signals.type();
+		if (kind == Kind.UNION) {
+			return container(signals);
+		}
+		if (kind != Kind.RECORD) {
+			throw new IllegalStateException(kind + " excludes no fact " + type.getName() + " has");
+		}
+		String record = label(ownWay(kind, signals), type);
+		String noun = signals.has(Signal.INTERFACE) ? "interface" : "abstract class";
+		String built = "which describes a class built through its constructor: ";
+		if (signals.has(Signal.SEALED)) {
+			return new CodeAnalysisException(String.format("%s is a sealed %s, a union of the classes it permits, but "
+					+ "carries %s, %sremove it", type.getName(), noun, record, built));
+		}
+		if (signals.has(Signal.UNION)) {
+			return new CodeAnalysisException(String.format("%s is an %s carrying @Union, a union of its members, but "
+					+ "carries %s, %sremove it", type.getName(), noun, record, built));
+		}
+		return new CodeAnalysisException(String.format("%s is an %s, which nothing can build, but carries %s, %s%s",
+				type.getName(), noun, record, built, signals.has(Signal.INTERFACE) ? "remove it"
+						: "make " + type.getSimpleName() + " concrete, or remove it"));
+	}
+
+	private static DataBindException unread(Entry entry, Kind kind, ClassSignals signals, Signal mark, String written,
 			Class<?> bridgedTo) {
 		Class<?> type = signals.type();
-		if (mark == Signal.FIELD_ORDER) {
-			return switch (kind) {
-				case TRANSPARENT -> new DataBindException(type.getName() + " carries @FieldOrder, but is @Transparent, "
-						+ "written as its one component; an order applies only to a class described by its own "
-						+ "components");
-				case TUPLE -> new CodeAnalysisException(type.getName() + " carries @FieldOrder, but is a @Tuple, whose "
-						+ "elements are its record components in declared order; an order applies only to a class "
-						+ "described by its own components");
-				default -> new DataBindException(String.format("%s carries @FieldOrder, but %s; an order applies only "
-						+ "to a class described by its own components, so it belongs on %s", type.getName(), written,
-						bridgedTo.getName()));
-			};
+		if (entry == Entry.REGISTER_ATOM && kind != Kind.ENUM && mark != Signal.FIELD_ORDER
+				&& (mark != Signal.UNION || signals.has(Signal.ABSTRACT))) {
+			return new CodeAnalysisException(String.format("%s %s, so nothing reads %s: remove it, or describe %s "
+					+ "rather than register it as an atom", type.getName(), written, label(mark, type),
+					type.getSimpleName()));
 		}
-		throw new IllegalStateException(kind + " reads " + mark + " of " + type.getName());
+		Signal own = ownWay(kind, signals);
+		if (own != null && WAYS.containsKey(mark)) {
+			return new CodeAnalysisException(String.format("%s says two ways to write it, %s, %s, and %s, %s: remove one "
+					+ "of them", type.getName(), label(own, type), WAYS.get(own), label(mark, type), WAYS.get(mark)));
+		}
+		if (mark == Signal.UNION) {
+			if (signals.has(Signal.MAP) || signals.has(Signal.COLLECTION)) {
+				return container(signals);
+			}
+			if (kind == Kind.BRIDGED && signals.has(Signal.ABSTRACT)) {
+				return new CodeAnalysisException(String.format("%s carries @Union, a union of its members, but "
+						+ "implements ToData, bridged to the record class it names: remove one of them", type.getName()));
+			}
+			return new CodeAnalysisException(String.format("%s carries @Union, but %s; @Union belongs on an interface "
+					+ "or abstract class, written as one of its members: remove it", type.getName(),
+					kind == Kind.NONE ? "is a concrete class" : written));
+		}
+		if (mark == Signal.FIELD_ORDER) {
+			return new CodeAnalysisException(String.format("%s carries @FieldOrder, but %s; an order applies only to a "
+					+ "class described by its own components, so %s", type.getName(), written,
+					bridgedTo != null ? "it belongs on " + bridgedTo.getName() : "remove it"));
+		}
+		if (mark == Signal.TO_DATA && kind == Kind.ENUM) {
+			return new CodeAnalysisException(String.format("%s %s, but implements ToData, which nothing reads: remove "
+					+ "it; an enum written another way is registered with its bridge, registerAtom(%s.class, bridge)",
+					type.getName(), written, type.getSimpleName()));
+		}
+		if (mark == Signal.RECORD_ON_HIDDEN_CONSTRUCTOR && kind != Kind.ENUM) {
+			return new CodeAnalysisException(String.format("%s marks %s @Record, but it is not public, so nothing "
+					+ "builds %s through it: make it public, or remove @Record", type.getName(),
+					constructor(type, Record.class, false), type.getSimpleName()));
+		}
+		return new CodeAnalysisException(String.format("%s %s, so nothing reads %s: remove it", type.getName(), written,
+				label(mark, type)));
+	}
+
+	/** Refuses a sealed or {@code @Union} type that is a map or a collection too. */
+	private static DataBindException container(ClassSignals signals) {
+		Class<?> type = signals.type();
+		boolean map = signals.has(Signal.MAP);
+		String container = map ? "java.util.Map" : "java.util.Collection";
+		String marked = signals.has(Signal.SEALED) ? "is sealed and a " : "carries @Union and is a ";
+		String fix = signals.has(Signal.SEALED) ? "unseal it" : "remove @Union";
+		return new CodeAnalysisException(String.format("%s %s%s, so it could mean a union, written as one of its "
+				+ "members, or %s: %s, or extend no %s", type.getName(), marked, container,
+				map ? "a map, written as its entries" : "a collection, written as its elements", fix, container));
+	}
+
+	/** How each mark that says how a record is written says it, completing "{@code type} is written ...". */
+	private static final Map<Signal, String> WAYS = Map.of(Signal.TRANSPARENT, "as its one component", Signal.TUPLE,
+			"as its components by position", Signal.RECORD_ON_TYPE, "as its components by name",
+			Signal.RECORD_ON_CONSTRUCTOR, "as its components by name", Signal.TO_DATA,
+			"as the record class it names");
+
+	/** The mark that gives {@code signals}' class {@code kind}, where one of the {@link #WAYS} does. */
+	private static Signal ownWay(Kind kind, ClassSignals signals) {
+		return switch (kind) {
+			case TRANSPARENT -> Signal.TRANSPARENT;
+			case TUPLE -> Signal.TUPLE;
+			case BRIDGED -> Signal.TO_DATA;
+			case RECORD -> signals.has(Signal.RECORD_ON_TYPE) ? Signal.RECORD_ON_TYPE
+					: signals.has(Signal.RECORD_ON_CONSTRUCTOR) ? Signal.RECORD_ON_CONSTRUCTOR : null;
+			default -> null;
+		};
+	}
+
+	private static String label(Signal mark, Class<?> type) {
+		return switch (mark) {
+			case TRANSPARENT -> "@Transparent";
+			case TUPLE -> "@Tuple";
+			case RECORD_ON_TYPE -> "@Record";
+			case RECORD_ON_CONSTRUCTOR -> "@Record on " + constructor(type, Record.class, true);
+			case RECORD_ON_HIDDEN_CONSTRUCTOR -> "@Record on " + constructor(type, Record.class, false);
+			case TO_DATA -> "ToData";
+			case UNION -> "@Union";
+			case FIELD_ORDER -> "@FieldOrder";
+			case ATOM_ON_TYPE, ATOM_ON_CONSTRUCTOR, ATOM_ON_STATIC_METHOD, ATOM_ON_INSTANCE_METHOD -> "@Atom";
+			default -> throw new IllegalStateException(mark + " is no mark");
+		};
+	}
+
+	/** The constructor of {@code type}, public or not, marked {@code annotation}, as {@code Name(Type, Type)}. */
+	private static String constructor(Class<?> type, Class<? extends Annotation> annotation, boolean isPublic) {
+		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+			if (constructor.isAnnotationPresent(annotation)
+					&& Modifier.isPublic(constructor.getModifiers()) == isPublic) {
+				return "the constructor " + type.getSimpleName() + parameters(constructor);
+			}
+		}
+		throw new IllegalStateException(type.getName() + " marks no constructor " + annotation.getSimpleName());
+	}
+
+	/** As the source declares them, the parameters a compact canonical constructor's metadata marks mandated too. */
+	private static String parameters(Executable executable) {
+		return Stream.of(executable.getParameterTypes()).map(Class::getSimpleName)
+				.collect(Collectors.joining(", ", "(", ")"));
 	}
 }

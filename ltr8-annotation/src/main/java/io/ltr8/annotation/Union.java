@@ -25,10 +25,14 @@ import java.lang.annotation.Target;
  *
  * <p><b>On an interface or an abstract class</b> it makes the type a union. With members listed it is a union of
  * those. With none it is open: each class described that implements or extends the type joins it. A Java
- * {@code sealed} type is a union of the classes it permits without this annotation.
+ * {@code sealed} type is a union of the classes it permits without this annotation; on one it states nothing, and
+ * a member list or {@code sealed = false} is refused. On any other class it is refused, and so it is on a type that
+ * is a {@code Map} or a {@code Collection} too, which could mean either.
  *
- * <p><b>On a component</b>, on its constructor parameter, field or accessor, it lists the classes that component's
- * value may be, where its declared type does not say.
+ * <p><b>On a component</b>, on a member of it -- a constructor parameter, a field, an accessor, a getter or a
+ * setter -- it lists the classes that component's value may be, where its declared type does not say. Where nothing
+ * reads it -- the component is {@link Unbound}, its type or its {@link Field} bridge decides its data class, or the
+ * member belongs to no component -- the class is refused.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })

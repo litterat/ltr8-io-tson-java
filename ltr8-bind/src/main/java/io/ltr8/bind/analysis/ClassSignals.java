@@ -49,6 +49,8 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 		RECORD_ON_TYPE,
 		/** {@code @Record} on a public constructor; a constructor selection reads no other. */
 		RECORD_ON_CONSTRUCTOR,
+		/** {@code @Record} on a constructor that is not public, which nothing builds the class through. */
+		RECORD_ON_HIDDEN_CONSTRUCTOR,
 		UNION,
 		ATOM_ON_TYPE,
 		/** {@code @Atom} on a constructor the class declares. */
@@ -101,6 +103,8 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 		add(present, Signal.COLLECTION, Collection.class.isAssignableFrom(type));
 		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
 			add(present, Signal.RECORD_ON_CONSTRUCTOR, Modifier.isPublic(constructor.getModifiers())
+					&& constructor.isAnnotationPresent(Record.class));
+			add(present, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR, !Modifier.isPublic(constructor.getModifiers())
 					&& constructor.isAnnotationPresent(Record.class));
 			add(present, Signal.ATOM_ON_CONSTRUCTOR, constructor.isAnnotationPresent(Atom.class));
 		}

@@ -216,19 +216,38 @@ class AtomFormTest {
 		});
 	}
 
+	/** Described or registered bare, a record's own {@code @Atom} is a second way to write it, and is refused. */
 	@Test
-	void aRecordMarkingAnAtomConstructorStaysARecord() throws DataBindException {
-		assertInstanceOf(DataClassRecord.class, context.getDescriptor(RecordWithAtomConstructor.class));
+	void aRecordMarkingAtomIsRefusedNamingTheBridgeThatGivesItAnAtomForm() {
+		String constructor = "the constructor RecordWithAtomConstructor(String)";
+		String accessor = "the method RecordWithAtomAccessor.code()";
+		assertAll(
+				() -> assertEquals(RecordWithAtomConstructor.class.getName() + " is a record, written as its "
+						+ "components, but carries @Atom on " + constructor + ", which says it is an atom: remove it; "
+						+ "an atom form for a record comes from registerAtom(RecordWithAtomConstructor.class, bridge)",
+						refusal(RecordWithAtomConstructor.class)),
+				() -> assertEquals(RecordWithAtomAccessor.class.getName() + " is a record, written as its components, "
+						+ "but carries @Atom on " + accessor + ", which says it is an atom: remove it; an atom form for "
+						+ "a record comes from registerAtom(RecordWithAtomAccessor.class, bridge)",
+						refusal(RecordWithAtomAccessor.class)),
+				() -> assertEquals(registered(RecordWithAtomConstructor.class, constructor),
+						registration(RecordWithAtomConstructor.class)),
+				() -> assertEquals(registered(RecordWithAtomAccessor.class, accessor),
+						registration(RecordWithAtomAccessor.class)));
 	}
 
-	@Test
-	void aRecordMarkingAnAtomAccessorStaysARecord() throws DataBindException {
-		assertInstanceOf(DataClassRecord.class, context.getDescriptor(RecordWithAtomAccessor.class));
+	private static List<String> registered(Class<?> record, String member) {
+		String refusal = record.getName() + " is registered as an atom, but is a record, whose @Atom on " + member
+				+ " nothing reads: remove it; an atom form for a record comes from registerAtom("
+				+ record.getSimpleName() + ".class, bridge)";
+		return List.of(CodeAnalysisException.class.getName() + ": " + refusal, refusal);
 	}
 
 	@Test
 	void aToDataClassMarkingNoWayInStaysABridgedRecord() {
-		assertEquals("Could not find constructor: class java.lang.String", refusal(ToDataWithoutAtom.class));
+		assertEquals(ToDataWithoutAtom.class.getName() + " implements ToData<String>, but java.lang.String is an atom; "
+				+ "ToData names a record class described by its own components: a class written as String is an atom, "
+				+ "and marks its way in @Atom", refusal(ToDataWithoutAtom.class));
 	}
 
 	// --- refused: no way out said
@@ -262,8 +281,8 @@ class AtomFormTest {
 	/** Registered as an atom, a class marking a way out and no way in would be one with no bridge. */
 	@Test
 	void aWayOutAloneIsRefusedWhenRegisteredAsAnAtom() {
-		assertAll(Stream.of(RecordWithAtomAccessor.class, InheritsMarkedAccessorWithoutWayIn.class).flatMap(type -> {
-			String wayOut = (type == RecordWithAtomAccessor.class ? type : CodeBase.class).getName() + ".code()";
+		assertAll(Stream.of(InheritsMarkedAccessorWithoutWayIn.class).flatMap(type -> {
+			String wayOut = CodeBase.class.getName() + ".code()";
 			String refusal = type.getName() + " says a way out, method " + wayOut + " marked @Atom, and marks no "
 					+ "constructor or static method @Atom: an atom's way in is one public constructor or public static "
 					+ "method marked @Atom, taking a value the wire carries";
