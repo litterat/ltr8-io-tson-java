@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.annotation.Typename;
+import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.atom.AtomRefusal;
@@ -48,15 +49,16 @@ final class TypeTagCheck {
      * the diagnostic says what would have; with them off, a name that <em>would</em> have named it says how to
      * ask for that, since the tag is then a type the caller's own classes define.
      */
-    static void unknown(TsonReadContext ctx, String name, Class<?> target, boolean hostTypes, boolean wouldName) {
+    static void unknown(TsonReadContext ctx, String name, DataClass target, boolean hostTypes, boolean wouldName) {
         if (hostTypes) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
-                    "unknown type '!" + name + "' -- not a built-in type, and it does not name " + target.getName(),
+                    "unknown type '!" + name + "' -- not a built-in type, and it does not name "
+                            + target.typeClass().getName(),
                     "a built-in type name or '!" + preferredName(target) + "'", "!" + name);
         } else if (wouldName) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
                     "unknown type '!" + name + "' -- not a built-in type, and no schema is in scope to define it; it"
-                            + " names " + target.getName() + ", which a schemaless bind links a tag to only"
+                            + " names " + target.typeClass().getName() + ", which a schemaless bind links a tag to only"
                             + " withHostTypes()",
                     "a built-in type name", "!" + name);
         } else {
@@ -96,32 +98,56 @@ final class TypeTagCheck {
     }
 
     /**
-     * Whether {@code target} answers to the wire name {@code name} -- its {@link Typename} exactly, else its
+     * Whether {@code target} answers to the wire name {@code name} -- its {@link DataClass#typeName} exactly, else its
      * simple class name case-insensitively, so {@code !point} links to a Java {@code Point} without every
      * fixture being annotated. The same match {@code DataClassObjectReader.bindUnion} applies to a union's
      * members, so a member and a directly-bound target are recognized by one rule.
      */
-    static boolean names(Class<?> target, String name) {
-        return declares(target, name)
-                || (target.getAnnotation(Typename.class) == null && target.getSimpleName().equalsIgnoreCase(name));
+    static boolean names(DataClass target, String name) {
+        return names(target.typeName().orElse(null), target.typeClass(), name);
     }
 
     /**
-     * Whether {@code target} <em>declares</em> the wire name -- {@link Typename} only, no simple-name
+     * {@link #names(DataClass, String)} for a union's member, whose {@link Typename} is read off the class: describing
+     * a member to ask its descriptor joins it to its open unions, so reading a value tagged for one member would
+     * change which names another union answers to.
+     */
+    static boolean names(Class<?> member, String name) {
+        return names(declaredName(member), member, name);
+    }
+
+    private static boolean names(String declared, Class<?> type, String name) {
+        return declared != null ? declared.equals(name) : type.getSimpleName().equalsIgnoreCase(name);
+    }
+
+    /**
+     * Whether {@code target} <em>declares</em> the wire name -- {@link DataClass#typeName} only, no simple-name
      * fallback. What an <b>atom</b> position uses, where the vocabulary is closed and a lookalike is a typo:
      * {@link #names} would match a UUID-targeted {@code !Uuid} against {@code UUID} and silently disable the
      * very check §5.1's case-sensitivity exists for. A container's wire name is a user-chosen type name, so
      * there the looser match is what a caller means.
      */
-    static boolean declares(Class<?> target, String name) {
-        Typename typename = target.getAnnotation(Typename.class);
-        return typename != null && typename.name().equals(name);
+    static boolean declares(DataClass target, String name) {
+        return declares(target.typeName().orElse(null), name);
+    }
+
+    /** {@link #declares(DataClass, String)} for a union's member, read off the class as {@link #names(Class, String)}. */
+    static boolean declares(Class<?> member, String name) {
+        return declares(declaredName(member), name);
+    }
+
+    private static boolean declares(String declared, String name) {
+        return declared != null && declared.equals(name);
+    }
+
+    private static String declaredName(Class<?> member) {
+        Typename typename = member.getAnnotation(Typename.class);
+        return typename == null ? null : typename.name();
     }
 
     /** The name {@link #names} would accept for {@code target}, for a diagnostic's {@code expected}. */
-    private static String preferredName(Class<?> target) {
-        Typename typename = target.getAnnotation(Typename.class);
-        return typename != null ? typename.name() : target.getSimpleName();
+    private static String preferredName(DataClass target) {
+        return target.typeName().orElse(target.typeClass().getSimpleName());
     }
 
     /** A core-value's shape as a word, for a diagnostic's {@code actual} -- shared with {@link AtomTypeReader}. */

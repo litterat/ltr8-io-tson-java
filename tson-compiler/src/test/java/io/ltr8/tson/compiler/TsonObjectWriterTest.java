@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.annotation.DataBridge;
+import io.ltr8.annotation.Transparent;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import org.junit.jupiter.api.Test;
@@ -148,6 +150,40 @@ class TsonObjectWriterTest {
     void writeUnionMemberWithExplicitTypenameUsesItVerbatim() throws DataBindException {
         NamedShapeHolder original = reader.read("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);
         assertEquals("{ shape: !sq { side: 2 } }", writer.toTson(original));
+    }
+
+    public sealed interface Labelled permits Label {
+    }
+
+    @Transparent
+    public record Label(String text) implements Labelled {
+    }
+
+    public record LabelledHolder(Labelled labelled) {
+    }
+
+    @Test
+    void writeTransparentUnionMemberWritesNoTag() throws DataBindException {
+        assertEquals("{ labelled: \"x\" }", writer.toTson(new LabelledHolder(new Label("x"))));
+    }
+
+    public static class LabelBridge implements DataBridge<String, Label> {
+        @Override
+        public String toData(Label label) {
+            return label.text();
+        }
+
+        @Override
+        public Label toObject(String text) {
+            return new Label(text);
+        }
+    }
+
+    /** Registered as an atom, {@code Label}'s descriptor is no transparent one; the class is still {@code @Transparent}. */
+    @Test
+    void writeTransparentUnionMemberRegisteredAsAnAtomWritesNoTag() throws DataBindException {
+        DataBindContext context = DataBindContext.builder().registerAtom(Label.class, new LabelBridge()).build();
+        assertEquals("{ labelled: \"x\" }", new TsonObjectWriter(context).toTson(new LabelledHolder(new Label("x"))));
     }
 
     @Test
