@@ -21,9 +21,18 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Used to tag a class as being an Atom data type. An Atom must contain
- * a constructor that accepts a single primitive value and implement
- * ToData which uses the same data type.
+ * Says a class is an atom, one scalar on the wire, by its way in and its way out.
+ *
+ * <p><b>On a public constructor or public static method</b> of the class itself, taking one value the wire carries --
+ * a primitive, a box, a {@code String}, a {@code BigInteger} or a {@code BigDecimal} -- it is the way in, and a class
+ * has one. <b>On a public instance method</b> taking nothing, possibly inherited, it is the way out, returning that
+ * value; {@link ToData} may be the way out instead. <b>On the class</b> it says the class is an atom, which then needs
+ * a way in.
+ *
+ * <p>An enum is an atom by its constants' names, and may carry it on its type alone. On a class bound as anything
+ * else -- a record of any kind, a union, a map, a collection, a class bridged through {@link ToData} -- it is refused;
+ * a record's atom form is a {@link DataBridge} registered for it. A super class's static way in builds the super
+ * class, and is refused from a subclass.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.CONSTRUCTOR, ElementType.TYPE, ElementType.METHOD })

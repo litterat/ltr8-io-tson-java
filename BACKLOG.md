@@ -530,15 +530,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   implementing the interface may or may not take it as its way out. Rule on it: refuse it, as
   `ComponentAnnotations.refuseAtom` refuses `@Atom` on a class described as something else
   (`UnreadAtomRefusalTest`), or apply it, with a test either way.
-- [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
-  says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
-  `Field`'s says nothing of several members: each attribute is taken from whichever member states it, two stating one
-  differently refuse the class, and a `@Profile` constructor's parameter prevails; `Union`'s lists "constructor
-  parameter, field or accessor" and omits a getter, a setter and a public field; neither says an annotation nothing
-  applies refuses the class. `tson-schema/CLAUDE.md`, `skills/tson-java/references/bindings.md` and `IntegerType`'s
-  Javadoc (`tson-schema`) say a class with more than one public constructor needs `@Record` on the canonical one,
-  which a Java record does not. A comment in `tson-compiler`'s `DataClassObjectReader` says a class joins its union as
-  it is analysed, where it joins once its component is cached. Correct each.
+- [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `tson-schema/CLAUDE.md`,
+  `skills/tson-java/references/bindings.md` and `IntegerType`'s Javadoc (`tson-schema`) say a class with more than one
+  public constructor needs `@Record` on the canonical one, which a Java record does not. A comment in
+  `tson-compiler`'s `DataClassObjectReader` says a class joins its union as it is analysed, where it joins once its
+  component is cached. Correct each.
 
 ## Documentation
 

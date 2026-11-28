@@ -28,7 +28,13 @@ import java.lang.annotation.Target;
  * it.
  *
  * <p><b>On a constructor</b> it says the same of the class, and picks that constructor where the class has more
- * than one public constructor serving no {@link Profile}. A class with one such constructor needs none marked.
+ * than one public constructor serving no {@link Profile}. A class with one such constructor needs none marked. On a
+ * constructor that is not public, which nothing builds the class through, it is refused.
+ *
+ * <p>It is refused where it cannot hold: on an interface, an abstract class or an enum, none of which is built as a
+ * record; beside {@link Tuple}, {@link Transparent} or {@link ToData}, each another way to write the class; and beside
+ * {@link Atom} on the class or a member of its own, since a record's atom form is a {@link DataBridge} registered for
+ * it.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.CONSTRUCTOR, ElementType.TYPE })

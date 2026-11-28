@@ -28,8 +28,9 @@ import java.lang.annotation.Target;
  * <p>Without it, the components a constructor takes come first, in parameter order, then the public fields and the
  * getter and setter pairs by wire name.
  *
- * <p>It orders a class described by its own components. On a {@link Tuple}, a {@link Transparent} class or one
- * bridged through {@link ToData} it has no effect.
+ * <p>It orders a class described by its own components. On any other -- a {@link Tuple}, a {@link Transparent}
+ * class, one bridged through {@link ToData}, an enum, a union, an atom, a map or a collection, or a class registered
+ * as an atom with no bridge -- it is refused.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.TYPE })
