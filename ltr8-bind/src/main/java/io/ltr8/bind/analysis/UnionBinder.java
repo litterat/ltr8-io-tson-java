@@ -23,6 +23,7 @@ public class UnionBinder {
 
 	public DataClassUnion resolveUnion(DataBindContext context, Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
+		ComponentAnnotations.refuseUnread(targetClass, "is a union, written as one of its members");
 		if (targetClass.isSealed()) {
 			List<Class<?>> unionMembers = new ArrayList<>();
 			collectSealedMembers(targetClass, unionMembers);

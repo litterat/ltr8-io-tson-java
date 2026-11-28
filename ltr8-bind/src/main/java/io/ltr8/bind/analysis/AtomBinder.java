@@ -145,6 +145,10 @@ public class AtomBinder {
 			throw new CodeAnalysisException("Failed to get atom descriptor", e);
 		}
 
+		if (descriptor != null) {
+			ComponentAnnotations.refuseUnread(targetClass, "is an atom bridged to "
+					+ descriptor.dataClass().getName());
+		}
 		return descriptor;
 	}
 
@@ -157,6 +161,7 @@ public class AtomBinder {
 	 * shapes).
 	 */
 	public DataClassAtom resolveEnum(Class<?> targetClass) throws CodeAnalysisException {
+		ComponentAnnotations.refuseUnread(targetClass, "is an enum, written as its constant's name");
 		try {
 			EnumStringBridge bridge = new EnumStringBridge(targetClass);
 

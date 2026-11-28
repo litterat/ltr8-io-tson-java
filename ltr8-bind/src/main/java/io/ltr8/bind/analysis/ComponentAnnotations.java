@@ -19,21 +19,27 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
+import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.analysis.ComponentInfo.Member;
 import io.ltr8.bind.analysis.ComponentInfo.Role;
 
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.RecordComponent;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -149,35 +155,108 @@ final class ComponentAnnotations {
 	/**
 	 * Refuses a binding annotation that nothing applies, once {@link #read} has settled {@code components}: one an
 	 * {@code @Unbound} component, the {@link Annotations} carrier or a component whose data class something else
-	 * decides never reads, and one on a field or method of {@code described} or a super class that is a member of no
-	 * component. A class declaring a {@code @Profile} constructor is spared the last for its instance members, which
-	 * may be another profile's components.
+	 * decides never reads, and one on a field or method of {@code described} or a super class, or a field or
+	 * instance method of an interface either implements, that is a member of no component. A class declaring a
+	 * {@code @Profile} constructor is spared the last for its instance members, which may be another profile's
+	 * components.
 	 */
 	static void refuseUnapplied(Class<?> described, List<ComponentInfo> components) throws CodeAnalysisException {
+		Set<AnnotatedElement> members = new HashSet<>();
 		for (ComponentInfo component : components) {
 			for (Member member : component.members()) {
 				refuseUnapplied(component, member);
-			}
-		}
-		// A method is a member where a subclass's override or visibility bridge of it is: a call dispatches there.
-		Set<Object> members = new HashSet<>();
-		for (ComponentInfo component : components) {
-			for (Member member : component.members()) {
-				members.add(member.element() instanceof Method method ? signature(method) : member.element());
+				members.add(member.element());
 			}
 		}
 		boolean profiled = Stream.of(described.getDeclaredConstructors())
 				.anyMatch(constructor -> constructor.isAnnotationPresent(Profile.class));
-		for (Class<?> declarer = described; declarer != null && declarer != Object.class
-				&& declarer != java.lang.Record.class; declarer = declarer.getSuperclass()) {
+		for (Class<?> declarer : supertypes(described)) {
 			for (AnnotatedElement element : declaredMembers(declarer)) {
+				// A class inherits no static method of an interface.
+				boolean inherited = !declarer.isInterface() || !(element instanceof Method) || !isStatic(element);
 				String annotation = bindingAnnotation(element);
-				Object member = element instanceof Method method && !isStatic(method) ? signature(method) : element;
-				if (annotation != null && !members.contains(member) && (!profiled || isStatic(element))) {
+				if (annotation != null && inherited && !members.contains(element) && (!profiled || isStatic(element))) {
 					throw new CodeAnalysisException(String.format(
 							"%s's %s carries %s, but is a member of no component, so nothing reads it",
 							described.getName(), describe(element), annotation));
 				}
+			}
+		}
+	}
+
+	/**
+	 * The methods declared in {@code described} or a supertype of it, other than {@code method}, that a call of
+	 * {@code method} on a {@code described} dispatches through: one it overrides, and one overriding it. A bridge or
+	 * synthetic method is the compiler's, and carries what the method it forwards to does.
+	 */
+	static List<Method> dispatchedWith(Class<?> described, Method method) {
+		List<Method> dispatched = new ArrayList<>();
+		if (isStatic(method) || Modifier.isPrivate(method.getModifiers())) {
+			return dispatched;
+		}
+		Map<TypeVariable<?>, Type> bindings = TypeArguments.implemented(described);
+		for (Class<?> declarer : supertypes(described)) {
+			for (Method other : declarer.getDeclaredMethods()) {
+				if (!other.equals(method) && !other.isBridge() && !other.isSynthetic() && !isStatic(other)
+						&& !Modifier.isPrivate(other.getModifiers()) && other.getName().equals(method.getName())
+						&& sameParameters(method, other, bindings) && overrides(method, other)) {
+					dispatched.add(other);
+				}
+			}
+		}
+		return dispatched;
+	}
+
+	/**
+	 * Whether the lower of two methods of one signature overrides the upper: the upper is reached from the lower's
+	 * class (JLS 8.4.8.1). Neither is private or static, and a class's method overrides an interface's.
+	 */
+	private static boolean overrides(Method method, Method other) {
+		boolean below = method.getDeclaringClass().isAssignableFrom(other.getDeclaringClass());
+		Method upper = below ? method : other;
+		Method lower = below ? other : method;
+		int modifiers = upper.getModifiers();
+		return Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)
+				|| upper.getDeclaringClass().getPackageName().equals(lower.getDeclaringClass().getPackageName())
+						&& upper.getDeclaringClass().getClassLoader() == lower.getDeclaringClass().getClassLoader();
+	}
+
+	/** Of one erasure, or of one type once the type arguments {@code described} supplies are substituted. */
+	private static boolean sameParameters(Method method, Method other, Map<TypeVariable<?>, Type> bindings) {
+		if (Arrays.equals(method.getParameterTypes(), other.getParameterTypes())) {
+			return true;
+		}
+		Type[] these = method.getGenericParameterTypes();
+		Type[] those = other.getGenericParameterTypes();
+		if (these.length != those.length) {
+			return false;
+		}
+		for (int i = 0; i < these.length; i++) {
+			if (!TypeArguments.sameType(TypeArguments.substitute(these[i], bindings),
+					TypeArguments.substitute(those[i], bindings))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** {@code type}, its super classes short of {@link Object} and {@link java.lang.Record}, and every interface. */
+	private static Set<Class<?>> supertypes(Class<?> type) {
+		Set<Class<?>> supertypes = new LinkedHashSet<>();
+		for (Class<?> declarer = type; declarer != null && declarer != Object.class
+				&& declarer != java.lang.Record.class; declarer = declarer.getSuperclass()) {
+			supertypes.add(declarer);
+		}
+		for (Class<?> declarer : List.copyOf(supertypes)) {
+			addInterfaces(declarer, supertypes);
+		}
+		return supertypes;
+	}
+
+	private static void addInterfaces(Class<?> type, Set<Class<?>> supertypes) {
+		for (Class<?> declared : type.getInterfaces()) {
+			if (supertypes.add(declared)) {
+				addInterfaces(declared, supertypes);
 			}
 		}
 	}
@@ -231,10 +310,76 @@ final class ComponentAnnotations {
 			throw new IllegalStateException(String.format("Record %s declares no canonical constructor",
 					record.getName()), e);
 		}
+		refuse(record, written, elements);
+	}
+
+	/**
+	 * Refuses {@code type}, whose binder writes it without reading any binding annotation of its own, where one of
+	 * its fields or methods, a parameter of one of its constructors, or a member of an enum constant's body carries
+	 * one. Where a subclass described by its own components may extend {@code type}, an instance field or method a
+	 * subclass reaches may be one of its components' members, and is that subclass's to judge; so is an interface's
+	 * method, which another class implementing it may have as a member, as an enum and a record sharing a union do.
+	 *
+	 * @param written how the binder writes it, completing "{@code type} ..."
+	 */
+	static void refuseUnread(Class<?> type, String written) throws CodeAnalysisException {
+		// A ToData class's subclass inherits ToData, and is refused as a class that does not declare it.
+		boolean extended = !Modifier.isFinal(type.getModifiers()) && !type.isEnum()
+				&& !ToData.class.isAssignableFrom(type);
+		List<AnnotatedElement> elements = new ArrayList<>();
+		for (AnnotatedElement element : declaredMembers(type)) {
+			if (!extended || isStatic(element) || element instanceof Method method
+					&& Modifier.isPrivate(method.getModifiers())) {
+				elements.add(element);
+			}
+		}
+		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+			elements.addAll(declaredParameters(constructor));
+		}
+		refuse(type, written, elements);
+		if (type.isEnum()) {
+			for (Object constant : type.getEnumConstants()) {
+				if (constant.getClass() == type) {
+					continue;
+				}
+				for (AnnotatedElement element : declaredMembers(constant.getClass())) {
+					String annotation = bindingAnnotation(element);
+					if (annotation != null) {
+						throw new CodeAnalysisException(String.format(
+								"%s %s, so nothing reads %s on the %s of the body of its constant %s",
+								type.getName(), written, annotation, element instanceof Method method
+										? "method " + method.getName() + parameters(method)
+										: "field " + ((java.lang.reflect.Field) element).getName(),
+								((Enum<?>) constant).name()));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Refuses {@code protocol}, read as its exchanges, where a field or method of it or an interface it extends, or
+	 * a method's parameter, carries a binding annotation: an exchange is a method, and none is a component.
+	 */
+	static void refuseInProtocol(Class<?> protocol) throws CodeAnalysisException {
+		List<AnnotatedElement> elements = new ArrayList<>();
+		for (Class<?> declarer : supertypes(protocol)) {
+			for (AnnotatedElement element : declaredMembers(declarer)) {
+				elements.add(element);
+				if (element instanceof Method method) {
+					elements.addAll(List.of(method.getParameters()));
+				}
+			}
+		}
+		refuse(protocol, "is a protocol, read as its exchanges", elements);
+	}
+
+	private static void refuse(Class<?> type, String written, List<AnnotatedElement> elements)
+			throws CodeAnalysisException {
 		for (AnnotatedElement element : elements) {
 			String annotation = bindingAnnotation(element);
 			if (annotation != null) {
-				throw new CodeAnalysisException(String.format("%s %s, so nothing reads %s on %s", record.getName(),
+				throw new CodeAnalysisException(String.format("%s %s, so nothing reads %s on %s", type.getName(),
 						written, annotation, element instanceof Parameter ? describe(element)
 								: "the " + describe(element).replaceFirst("^static ", "")));
 			}
@@ -257,10 +402,6 @@ final class ComponentAnnotations {
 		return declared;
 	}
 
-	private static List<Object> signature(Method method) {
-		return List.of(method.getName(), List.of(method.getParameterTypes()));
-	}
-
 	private static String bindingAnnotation(AnnotatedElement element) {
 		return element.isAnnotationPresent(Field.class) ? "@Field"
 				: element.isAnnotationPresent(Union.class) ? "@Union"
@@ -280,11 +421,30 @@ final class ComponentAnnotations {
 					+ method.getName() + parameters(method);
 			case Parameter parameter -> {
 				Executable executable = parameter.getDeclaringExecutable();
-				yield "parameter " + List.of(executable.getParameters()).indexOf(parameter) + " of the constructor "
-						+ executable.getDeclaringClass().getSimpleName() + parameters(executable);
+				List<Parameter> declared = declaredParameters(executable);
+				yield "parameter " + declared.indexOf(parameter) + " of the "
+						+ (executable instanceof Method method ? "method " + method.getDeclaringClass().getSimpleName()
+								+ "." + method.getName() : "constructor " + executable.getDeclaringClass().getSimpleName())
+						+ declared.stream().map(declaredParameter -> declaredParameter.getType().getSimpleName())
+								.collect(Collectors.joining(", ", "(", ")"));
 			}
 			default -> throw new IllegalStateException(element + " is no field, method or parameter");
 		};
+	}
+
+	/**
+	 * The parameters {@code executable}'s source declares. A class file without parameter metadata marks none
+	 * implicit, and javac passes an enum constructor its constant's name and ordinal first, as
+	 * {@link Constructor#getParameterAnnotations} also assumes.
+	 */
+	private static List<Parameter> declaredParameters(Executable executable) {
+		Parameter[] parameters = executable.getParameters();
+		List<Parameter> declared = Stream.of(parameters)
+				.filter(parameter -> !parameter.isSynthetic() && !parameter.isImplicit()).toList();
+		return executable instanceof Constructor<?> && executable.getDeclaringClass().isEnum()
+				&& declared.size() == parameters.length && parameters.length >= 2
+				&& parameters[0].getType() == String.class && parameters[1].getType() == int.class
+						? declared.subList(2, declared.size()) : declared;
 	}
 
 	/**
