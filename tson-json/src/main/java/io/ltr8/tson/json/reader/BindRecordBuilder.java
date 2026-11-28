@@ -4,7 +4,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.UnboundNameException;
@@ -24,11 +23,8 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Top;
 
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Bind mode's record: the bound class, constructed from the filled slots -- or nothing, where anything under the
@@ -119,10 +115,10 @@ final class BindRecordBuilder implements RecordBuilder {
             }
         }
         DataClassField carrier = descriptor.annotationsCarrier().orElse(null);
-        Set<String> unbound = unboundComponents(descriptor.typeClass());
+        // fields() holds no @Unbound component, so every component here is one a field must fill.
         for (int i = 0; i < descriptor.fields().length; i++) {
             DataClassField component = descriptor.fields()[i];
-            if (!filled[i] && component != carrier && !unbound.contains(component.name())) {
+            if (!filled[i] && component != carrier) {
                 mismatches.add("component '" + component.name() + "' is filled by no field, so it reaches the "
                         + "constructor as null on every document -- annotate it @Unbound if the class means to "
                         + "own it");
@@ -334,20 +330,5 @@ final class BindRecordBuilder implements RecordBuilder {
                     + bound.typeClass().getName() + " cannot hold: " + e.getMessage());
             return null;
         }
-    }
-
-    /** The components a class marked as its own ({@code @Unbound}), on the component or its accessor. */
-    private static Set<String> unboundComponents(Class<?> type) {
-        RecordComponent[] components = type.getRecordComponents();
-        Set<String> unbound = new LinkedHashSet<>();
-        if (components != null) {
-            for (RecordComponent component : components) {
-                if (component.isAnnotationPresent(Unbound.class)
-                        || component.getAccessor().isAnnotationPresent(Unbound.class)) {
-                    unbound.add(component.getName());
-                }
-            }
-        }
-        return unbound;
     }
 }

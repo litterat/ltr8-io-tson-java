@@ -158,9 +158,9 @@ final class ComponentAnnotations {
 	 * Refuses a binding annotation that nothing applies, once {@link #read} has settled {@code components}: one an
 	 * {@code @Unbound} component, the {@link Annotations} carrier or a component whose data class something else
 	 * decides never reads, and one on a field or method of {@code described} or a super class, or a field or
-	 * instance method of an interface either implements, that is a member of no component. A class declaring a
-	 * {@code @Profile} constructor is spared the last for its instance members, which may be another profile's
-	 * components.
+	 * instance method of an interface either implements, or on such a method's parameter, that is a member of no
+	 * component. A class declaring a {@code @Profile} constructor is spared the last for its instance members, which
+	 * may be another profile's components.
 	 */
 	static void refuseUnapplied(Class<?> described, List<ComponentInfo> components) throws CodeAnalysisException {
 		Set<AnnotatedElement> members = new HashSet<>();
@@ -173,14 +173,19 @@ final class ComponentAnnotations {
 		boolean profiled = Stream.of(described.getDeclaredConstructors())
 				.anyMatch(constructor -> constructor.isAnnotationPresent(Profile.class));
 		for (Class<?> declarer : supertypes(described)) {
-			for (AnnotatedElement element : declaredMembers(declarer)) {
+			for (AnnotatedElement declared : declaredMembers(declarer)) {
 				// A class inherits no static method of an interface.
-				boolean inherited = !declarer.isInterface() || !(element instanceof Method) || !isStatic(element);
-				String annotation = bindingAnnotation(element);
-				if (annotation != null && inherited && !members.contains(element) && (!profiled || isStatic(element))) {
-					throw new CodeAnalysisException(String.format(
-							"%s's %s carries %s, but is a member of no component, so nothing reads it",
-							described.getName(), describe(element), annotation));
+				boolean inherited = !declarer.isInterface() || !(declared instanceof Method) || !isStatic(declared);
+				if (!inherited || profiled && !isStatic(declared)) {
+					continue;
+				}
+				for (AnnotatedElement element : withParameters(declared)) {
+					String annotation = bindingAnnotation(element);
+					if (annotation != null && !members.contains(element)) {
+						throw new CodeAnalysisException(String.format(
+								"%s's %s carries %s, but is a member of no component, so nothing reads it",
+								described.getName(), describe(element), annotation));
+					}
 				}
 			}
 		}
@@ -298,12 +303,16 @@ final class ComponentAnnotations {
 
 	/**
 	 * Refuses {@code record}, which its binder writes without reading any binding annotation of its own, where one
-	 * of its fields or methods, or a parameter of its canonical constructor, carries one.
+	 * of its fields or methods, a parameter of one of its methods, or a parameter of its canonical constructor,
+	 * carries one.
 	 *
 	 * @param written how the binder writes it, completing "{@code record} ..."
 	 */
 	static void refuseAny(Class<?> record, String written) throws CodeAnalysisException {
-		List<AnnotatedElement> elements = new ArrayList<>(declaredMembers(record));
+		List<AnnotatedElement> elements = new ArrayList<>();
+		for (AnnotatedElement element : declaredMembers(record)) {
+			elements.addAll(withParameters(element));
+		}
 		Class<?>[] types = Stream.of(record.getRecordComponents()).map(RecordComponent::getType)
 				.toArray(Class<?>[]::new);
 		try {
@@ -317,10 +326,11 @@ final class ComponentAnnotations {
 
 	/**
 	 * Refuses {@code type}, whose binder writes it without reading any binding annotation of its own, where one of
-	 * its fields or methods, a parameter of one of its constructors, or a member of an enum constant's body carries
-	 * one. Where a subclass described by its own components may extend {@code type}, an instance field or method a
-	 * subclass reaches may be one of its components' members, and is that subclass's to judge; so is an interface's
-	 * method, which another class implementing it may have as a member, as an enum and a record sharing a union do.
+	 * its fields or methods, a parameter of one of its methods or constructors, or a member of an enum constant's
+	 * body or a parameter of one of its methods carries one. Where a subclass described by its own components may
+	 * extend {@code type}, an instance field or method a subclass reaches, and that method's parameters, may be
+	 * members of one of its components, and are that subclass's to judge; so is an interface's method, which another
+	 * class implementing it may have as a member, as an enum and a record sharing a union do.
 	 *
 	 * @param written how the binder writes it, completing "{@code type} ..."
 	 */
@@ -332,7 +342,7 @@ final class ComponentAnnotations {
 		for (AnnotatedElement element : declaredMembers(type)) {
 			if (!extended || isStatic(element) || element instanceof Method method
 					&& Modifier.isPrivate(method.getModifiers())) {
-				elements.add(element);
+				elements.addAll(withParameters(element));
 			}
 		}
 		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
@@ -414,18 +424,32 @@ final class ComponentAnnotations {
 			if (constant.getClass() == type) {
 				continue;
 			}
-			for (AnnotatedElement element : declaredMembers(constant.getClass())) {
-				String annotation = annotationOf.apply(element);
-				if (annotation != null) {
-					throw new CodeAnalysisException(String.format(
-							"%s %s, so nothing reads %s on the %s of the body of its constant %s",
-							type.getName(), written, annotation, element instanceof Method method
-									? "method " + method.getName() + parameters(method)
-									: "field " + ((java.lang.reflect.Field) element).getName(),
-							((Enum<?>) constant).name()));
+			for (AnnotatedElement declared : declaredMembers(constant.getClass())) {
+				for (AnnotatedElement element : withParameters(declared)) {
+					String annotation = annotationOf.apply(element);
+					if (annotation != null) {
+						throw new CodeAnalysisException(String.format(
+								"%s %s, so nothing reads %s on %s of the body of its constant %s",
+								type.getName(), written, annotation, describeInBody(element),
+								((Enum<?>) constant).name()));
+					}
 				}
 			}
 		}
+	}
+
+	/** An enum constant's body is an anonymous class, so names no class. */
+	private static String describeInBody(AnnotatedElement element) {
+		return switch (element) {
+			case java.lang.reflect.Field field -> "the field " + field.getName();
+			case Method method -> "the method " + method.getName() + parameters(method);
+			case Parameter parameter -> {
+				Executable method = parameter.getDeclaringExecutable();
+				yield "parameter " + declaredParameters(method).indexOf(parameter) + " of the method "
+						+ method.getName() + parameters(method);
+			}
+			default -> throw new IllegalStateException(element + " is no field, method or parameter");
+		};
 	}
 
 	/**
@@ -471,6 +495,15 @@ final class ComponentAnnotations {
 			}
 		}
 		return declared;
+	}
+
+	/** {@code member}, and the parameters its source declares where it is a method. */
+	private static List<AnnotatedElement> withParameters(AnnotatedElement member) {
+		List<AnnotatedElement> elements = new ArrayList<>(List.of(member));
+		if (member instanceof Method method) {
+			elements.addAll(declaredParameters(method));
+		}
+		return elements;
 	}
 
 	private static String bindingAnnotation(AnnotatedElement element) {
@@ -617,7 +650,7 @@ final class ComponentAnnotations {
 				Executable executable = parameter.getDeclaringExecutable();
 				yield "parameter " + List.of(executable.getParameters()).indexOf(parameter) + " of the "
 						+ member.role().noun() + " " + executable.getDeclaringClass().getSimpleName()
-						+ parameters(executable);
+						+ (executable instanceof Method method ? "." + method.getName() : "") + parameters(executable);
 			}
 			case RecordComponent component -> "the " + member.role().noun() + " "
 					+ component.getDeclaringRecord().getSimpleName() + "." + component.getName();

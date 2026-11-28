@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.DataBridge;
+import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -68,6 +69,29 @@ class BindStrictnessTest {
     public record OrderTraced(String sku, int quantity, String currency, @Unbound Optional<String> trace) {
     }
 
+    /** The same, marked on the explicit canonical constructor's parameter alone. */
+    public record OrderTracedByParameter(String sku, int quantity, String currency, Optional<String> trace) {
+        public OrderTracedByParameter(String sku, int quantity, String currency, @Unbound Optional<String> trace) {
+            this.sku = sku;
+            this.quantity = quantity;
+            this.currency = currency;
+            this.trace = trace;
+        }
+    }
+
+    /** {@code region} binds the name {@code trace}, which the class's own component {@code trace} gives up. */
+    public record OrderRenamedAway(String sku, int quantity, String currency, @Unbound String trace,
+                                   @Field("trace") String region) {
+        public OrderRenamedAway(String sku, int quantity, String currency, @Field("traceId") String trace,
+                                String region) {
+            this.sku = sku;
+            this.quantity = quantity;
+            this.currency = currency;
+            this.trace = trace;
+            this.region = region;
+        }
+    }
+
     private static Tson tson(String schema, Class<?> bound) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaModelNameBinder.INSTANCE.resolve(name);
@@ -118,6 +142,25 @@ class BindStrictnessTest {
                 DiagnosticsReceiver.throwing());
 
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()), value);
+    }
+
+    @Test
+    void aComponentUnboundOnItsConstructorParameterAloneIsTheClassesOwn() {
+        Object value = read(tson(SCHEMA, OrderTracedByParameter.class), OrderTracedByParameter.class,
+                DiagnosticsReceiver.throwing());
+
+        assertEquals(new OrderTracedByParameter("A", 1, "AUD", Optional.empty()), value);
+    }
+
+    /** An unbound component is matched by no name, so its Java name excuses no other component. */
+    @Test
+    void aComponentNamedAsAnUnboundOneIsStillFilledByAField() {
+        Tson tson = tson(SCHEMA, OrderRenamedAway.class);
+
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
+                () -> tson.bindRegistry().get(ID));
+
+        assertTrue(thrown.getMessage().contains("component 'trace' is filled by no field"), thrown.getMessage());
     }
 
     /**

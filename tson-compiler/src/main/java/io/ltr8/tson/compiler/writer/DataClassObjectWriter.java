@@ -355,7 +355,12 @@ public final class DataClassObjectWriter {
      */
     private DataClass descriptorOf(Object value) throws DataBindException {
         return value instanceof Namespace<?> || value instanceof ValueEntry ? null
-                : context.getDescriptor(value.getClass());
+                : context.getDescriptor(describedClass(value));
+    }
+
+    /** An enum constant with a body is an instance of the body's anonymous class, which nothing describes. */
+    private static Class<?> describedClass(Object value) {
+        return value instanceof Enum<?> constant ? constant.getDeclaringClass() : value.getClass();
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -521,7 +526,7 @@ public final class DataClassObjectWriter {
             write(value, dataClass, writer, null);
             return;
         }
-        Class<?> memberClass = value.getClass();
+        Class<?> memberClass = describedClass(value);
         if (!dataClass.isMemberType(memberClass)) {
             throw new DataBindException(
                     "value of type " + memberClass + " is not a member of union " + dataClass.typeClass());

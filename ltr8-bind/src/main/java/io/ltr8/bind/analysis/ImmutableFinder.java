@@ -28,12 +28,15 @@ import java.lang.classfile.ClassModel;
 import java.lang.classfile.CodeElement;
 import java.lang.classfile.CodeModel;
 import java.lang.classfile.Instruction;
+import java.lang.classfile.Label;
 import java.lang.classfile.MethodModel;
 import java.lang.classfile.Opcode;
 import java.lang.classfile.TypeKind;
+import java.lang.classfile.instruction.BranchInstruction;
 import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
+import java.lang.classfile.instruction.LabelTarget;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.ReturnInstruction;
 import java.lang.classfile.instruction.StoreInstruction;
@@ -69,8 +72,8 @@ import java.util.stream.Collectors;
  * so called must be public. A parameter the analysis cannot follow, computed or passed up beside any other argument,
  * is named with {@link Field @Field}.
  *
- * <p>A component is read back through a public instance method of the class or a super class that returns its field,
- * other than one {@code Object} declares, or a public method of its name carrying {@code @Field} or
+ * <p>A component is read back through a public instance method of the class or a super class that returns its field
+ * and no other, other than one {@code Object} declares, or a public method of its name carrying {@code @Field} or
  * {@link Union @Union}; failing both, through the field itself where that is public. Of several methods returning
  * the field, the accessors are those carrying {@code @Field} or {@code @Union} and those named for the component.
  * A member a super class that is not public declares is reached as the JVM reaches it, through a public subclass:
@@ -278,62 +281,76 @@ public class ImmutableFinder implements ComponentFinder {
     }
 
     /**
-     * Looks through a zero-arg method's instructions for the ALOAD-GETFIELD-RETURN pattern that
-     * identifies a simple accessor. The field used in the GETFIELD instruction must already
-     * have been discovered via the constructor (in {@code fields}).
+     * Follows a zero-argument method's instructions for the fields its returns hand back: one is handed back where
+     * {@code this} is loaded and the field read just before the return, or before a {@code goto} landing there, as a
+     * conditional expression's arm is. A method handing back one field, a component's, is a candidate accessor of
+     * that component; one handing back two reads neither. A return of any other value is not followed.
      *
-     * @return whether the method returns a component's field
+     * @return whether a return hands back a component's field, the method a candidate or not
      */
     private boolean examineAccessor(Class<?> clss, List<ComponentInfo> fields, MethodModel method,
             Map<ComponentInfo, List<Method>> candidates) throws NoSuchMethodException, SecurityException {
-        boolean foundLoadThis = false;
-        String lastField = null;
-        Class<?> lastDeclarer = null;
-        boolean accessor = false;
-
         CodeModel code = method.code().orElse(null);
         if (code == null) {
             return false;
         }
 
+        // The fields the value on top of the stack may be.
+        Set<java.lang.reflect.Field> top = new HashSet<>();
+        boolean thisLoaded = false;
+        Map<Label, Set<java.lang.reflect.Field>> arriving = new HashMap<>();
+        Set<java.lang.reflect.Field> returned = new HashSet<>();
         for (CodeElement element : code) {
-            if (element instanceof LoadInstruction load) {
-                if (load.slot() == 0) {
-                    foundLoadThis = true;
+            switch (element) {
+                case LabelTarget target -> top.addAll(arriving.getOrDefault(target.label(), Set.of()));
+                case LoadInstruction load when load.slot() == 0 -> {
+                    top.clear();
+                    thisLoaded = true;
                 }
-            } else if (element instanceof FieldInstruction field && field.opcode() == Opcode.GETFIELD) {
-                if (foundLoadThis) {
-                    lastField = field.name().stringValue();
-                    lastDeclarer = fieldDeclarer(clss, field.owner().asInternalName(), lastField);
-                }
-            } else if (element instanceof ReturnInstruction) {
-                if (foundLoadThis && lastField != null) {
-                    final String fieldName = lastField;
-                    final Class<?> declarer = lastDeclarer;
-                    ComponentInfo info = declarer == null ? null : fields.stream()
-                            .filter(e -> e.getName().equals(fieldName)
-                                    && (e.getDeclaringClass() == null || e.getDeclaringClass() == declarer))
-                            .findFirst().orElse(null);
-                    if (info != null) {
-                        Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
-                        List<Method> returning = candidates.computeIfAbsent(info, key -> new ArrayList<>());
-                        if (!returning.contains(accessorMethod)) {
-                            returning.add(accessorMethod);
-                        }
-                        accessor = true;
+                case FieldInstruction field when field.opcode() == Opcode.GETFIELD -> {
+                    java.lang.reflect.Field read = thisLoaded
+                            ? resolveField(clss, field.owner().asInternalName(), field.name().stringValue()) : null;
+                    top.clear();
+                    if (read != null) {
+                        top.add(read);
                     }
+                    thisLoaded = false;
                 }
-                // Fall through to reset -- a return ends the accessor pattern either way.
-                foundLoadThis = false;
-                lastField = null;
-            } else if (element instanceof Instruction) {
-                foundLoadThis = false;
-                lastField = null;
+                case BranchInstruction branch when branch.opcode() == Opcode.GOTO
+                        || branch.opcode() == Opcode.GOTO_W -> {
+                    arriving.computeIfAbsent(branch.target(), label -> new HashSet<>()).addAll(top);
+                    top.clear();
+                    thisLoaded = false;
+                }
+                case ReturnInstruction _ -> {
+                    returned.addAll(top);
+                    top.clear();
+                    thisLoaded = false;
+                }
+                case Instruction _ -> {
+                    top.clear();
+                    thisLoaded = false;
+                }
+                default -> {
+                    // A line number or a local variable's entry carries no value.
+                }
             }
-            // Non-instruction elements (labels, line numbers, etc.) don't affect the invariant.
         }
 
-        return accessor;
+        List<ComponentInfo> components = new ArrayList<>();
+        for (java.lang.reflect.Field read : returned) {
+            fields.stream().filter(e -> e.getName().equals(read.getName())
+                    && (e.getDeclaringClass() == null || e.getDeclaringClass() == read.getDeclaringClass()))
+                    .findFirst().ifPresent(components::add);
+        }
+        if (returned.size() == 1 && components.size() == 1) {
+            Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
+            List<Method> returning = candidates.computeIfAbsent(components.getFirst(), key -> new ArrayList<>());
+            if (!returning.contains(accessorMethod)) {
+                returning.add(accessorMethod);
+            }
+        }
+        return !components.isEmpty();
     }
 
     private static Class<?> fieldDeclarer(Class<?> clss, String owner, String name) {
