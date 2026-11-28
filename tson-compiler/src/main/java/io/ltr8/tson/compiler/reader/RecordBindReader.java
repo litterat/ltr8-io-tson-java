@@ -339,11 +339,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClass dataClass = descriptorFor(name, typeDefinition, context);
 
             if (context.subtypesOf(name, typeDefinition).isEmpty()) {
-                Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
-                if (labelled != null) {
-                    SchemaLocation location = context.locationOf(name);
-                    return new GroupUnionBindReader(name, context.displayName(name, typeDefinition), body,
-                            labelled, resolver, location, fieldNameRule(name, body, context));
+                if (dataClass instanceof DataClassUnion union) {
+                    String displayName = context.displayName(name, typeDefinition);
+                    return new GroupUnionBindReader(name, displayName, body,
+                            labelledChoice(displayName, body, union), resolver, context.locationOf(name),
+                            fieldNameRule(name, body, context));
                 }
                 return new RecordBindReader(name, context.displayName(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver, context,
@@ -373,50 +373,82 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return Subsumption.dispatching(name, typeDefinition, ownParser, context.namesMeaning(), resolver);
             }
 
-            throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
-                    + ", which is neither record- nor union-shaped -- can't bind '" + name + "' as either");
+            throw notRecordShaped(name, dataClass);
         }
 
         /**
          * The union members of an <b>untagged labelled choice</b>, keyed by the schema field each one
-         * carries, or {@code null} when this is not one -- see {@link GroupUnionBindReader}.
+         * carries -- see {@link GroupUnionBindReader}.
          *
-         * <p>Three things must line up, and all three are checked rather than assumed: the Java target is a
-         * sealed union, the schema body is one non-optional group of one-field options covering every field it
-         * declares -- exclusive alternatives, so neither the {@code +} group nor an option of several fields --
-         * and each member carries exactly one component whose wire name is one of those fields. A near-miss falls
-         * through to the ordinary record path, where {@link #requireRecord} reports it -- guessing at a
-         * partial match would bind a member to a field it does not carry.
+         * <p>Everything that must line up is checked rather than assumed: the schema body is one non-optional
+         * group of one-field options covering every field it declares -- exclusive alternatives, so neither the
+         * {@code +} group nor an option of several fields -- and each member carries exactly one component whose
+         * wire name is one of those fields. A near-miss is a {@link BindMismatchException} naming what did not line
+         * up: guessing at a partial match would bind a member to a field it does not carry.
          */
-        private Map<String, DataClassRecord> labelledChoice(RecordBody body, DataClass dataClass) {
-            if (!(dataClass instanceof DataClassUnion union) || body.groups().size() != 1) {
-                return null;
-            }
-            FieldGroup group = body.groups().getFirst();
-            if (group.optional()
-                    || group.members().stream().anyMatch(option -> option.size() != 1)
-                    || group.memberNames().size() != body.fields().size()
-                    || union.memberTypes().length != body.fields().size()) {
-                return null;
-            }
+        private Map<String, DataClassRecord> labelledChoice(String displayName, RecordBody body,
+                                                            DataClassUnion union) {
+            List<String> mismatches = new ArrayList<>();
             Map<String, DataClassRecord> byField = new LinkedHashMap<>();
-            for (Class<?> memberType : union.memberTypes()) {
-                DataClass member;
-                try {
-                    member = context.getDescriptor(memberType);
-                } catch (DataBindException e) {
-                    return null;
+            String shape = labelledShapeMismatch(body, union);
+            if (shape != null) {
+                mismatches.add(shape);
+            } else {
+                FieldGroup group = body.groups().getFirst();
+                for (Class<?> memberType : union.memberTypes()) {
+                    DataClass member;
+                    try {
+                        member = context.getDescriptor(memberType);
+                    } catch (DataBindException e) {
+                        mismatches.add("member " + memberType.getName() + " does not bind: " + e.getMessage());
+                        continue;
+                    }
+                    String label = member instanceof DataClassRecord record ? GroupUnionBindReader.labelOf(record)
+                            : null;
+                    if (label == null) {
+                        mismatches.add("member " + memberType.getName() + " is not a record of one component, "
+                                + "the field it is the label for");
+                    } else if (!group.hasMember(label) || byField.containsKey(label)) {
+                        mismatches.add("member " + memberType.getName() + "'s component '" + label + "' labels "
+                                + (group.hasMember(label) ? "a field another member labels"
+                                        : "no field of the record"));
+                    } else {
+                        byField.put(label, (DataClassRecord) member);
+                    }
                 }
-                if (!(member instanceof DataClassRecord record)) {
-                    return null;
-                }
-                String label = GroupUnionBindReader.labelOf(record);
-                if (label == null || !group.hasMember(label)) {
-                    return null;
-                }
-                byField.put(label, record);
             }
-            return byField.size() == body.fields().size() ? byField : null;
+            if (!mismatches.isEmpty()) {
+                throw new BindMismatchException("'" + displayName + "' is a record, and "
+                        + union.typeClass().getName() + ", which is bound to it, is a union: a record with no "
+                        + "subtypes binds to one only as a labelled choice -- one REQUIRED group of one-field "
+                        + "options over every field, each member a record carrying one of them -- and "
+                        + String.join("; ", mismatches));
+            }
+            return byField;
+        }
+
+        /** What stops {@code body}'s own shape being a labelled choice for {@code union}, or null where nothing does. */
+        private static String labelledShapeMismatch(RecordBody body, DataClassUnion union) {
+            List<FieldGroup> groups = body.groups();
+            if (groups.size() != 1) {
+                return "the record has " + groups.size() + " groups";
+            }
+            FieldGroup group = groups.getFirst();
+            if (group.optional()) {
+                return "its group is optional, so a record with no field present has no member to be";
+            }
+            if (group.members().stream().anyMatch(option -> option.size() != 1)) {
+                return "an option of its group holds several fields, so a member would need several components";
+            }
+            if (group.memberNames().size() != body.fields().size()) {
+                return "its group covers " + group.memberNames().size() + " of its " + body.fields().size()
+                        + " fields";
+            }
+            if (union.memberTypes().length != body.fields().size()) {
+                return "the union has " + union.memberTypes().length + " members for " + body.fields().size()
+                        + " fields";
+            }
+            return null;
         }
 
         /**
@@ -474,10 +506,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
         private static DataClassRecord requireRecord(String name, DataClass dataClass) {
             if (!(dataClass instanceof DataClassRecord descriptor)) {
-                throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
-                        + ", which isn't record-shaped -- can't bind '" + name + "' as one");
+                throw notRecordShaped(name, dataClass);
             }
             return descriptor;
+        }
+
+        private static BindMismatchException notRecordShaped(String name, DataClass dataClass) {
+            return new BindMismatchException("'" + name + "' is a record, and " + dataClass.typeClass().getName()
+                    + ", which is bound to it, is not record-shaped");
         }
     }
 }

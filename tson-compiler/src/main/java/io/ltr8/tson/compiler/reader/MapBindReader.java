@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -156,8 +157,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
                     : body.ordered() ? LinkedHashMap.class : Map.class;
             DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
-                throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
-                        + ", which isn't map-shaped -- can't bind '" + name + "' as one");
+                throw new BindMismatchException("'" + name + "' is a map, and " + dataClass.typeClass().getName()
+                        + ", which it binds to, is not map-shaped in this bind context");
             }
             return new MapBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name), AnnotationTypes.of(context),

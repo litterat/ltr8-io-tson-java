@@ -174,13 +174,6 @@ spec-required case:
   cannot hold". `tson-json`'s `BindRecordBuilder.statedValue` asks the atom for the component's class, and
   `BooleanParser.boundTo` answers for `Boolean` and not the primitive. The TSON stack reads the same configuration.
   Bind a stated value to a primitive component through its box, with a `CrossEncodingParityTest` case.
-- [ ] **A host class of the wrong shape is a deferred gap in TSON and a bind mismatch in JSON.** A record type bound
-  to a class that is not record-shaped throws `IllegalArgumentException` from `RecordBindReader`, which
-  `TsonSchemaCompiler`'s compile loop turns into an `ErrorReader`, so the read reports `NOT_IMPLEMENTED`; JSON's
-  `BindRecordBuilder` throws `BindMismatchException` at compile. `ArrayBindReader`, `MapBindReader` and
-  `TupleBindReader` check their hosts the same way. The wiring is the deployment's: throw `BindMismatchException`
-  in the TSON readers, with a parity case. `CheckpointCompileTest` binds a record to a sealed interface on a
-  checkpoint path and needs the same verdict there.
 - [ ] **The compile loops turn any failure to build a reader into a deferred gap.** `TsonSchemaCompiler` and
   `JsonSchemaCompiler` each catch `RuntimeException` around a factory and stand an `ErrorReader` in, which a read
   reports as `NOT_IMPLEMENTED`. A checkpoint compile relies on it (an application not yet closed, an entry not yet

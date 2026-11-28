@@ -164,8 +164,8 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                         AnnotationTypes.of(context));
             }
             if (!(dataClass instanceof DataClassTuple descriptor)) {
-                throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
-                        + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
+                throw new BindMismatchException("'" + name + "' is a tuple, and " + dataClass.typeClass().getName()
+                        + ", which is bound to it, is not tuple-shaped");
             }
             List<String> mismatches = disagreements(body, descriptor);
             if (!mismatches.isEmpty()) {

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -190,8 +191,8 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                     element -> resolveElementType(element, context));
             DataClass dataClass = descriptorFor(new DataParameterizedType(List.class, elementType));
             if (!(dataClass instanceof DataClassArray descriptor)) {
-                throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
-                        + ", which isn't array-shaped -- can't bind '" + name + "' as one");
+                throw new BindMismatchException("'" + name + "' is an array, and " + dataClass.typeClass().getName()
+                        + ", which it binds to, is not array-shaped in this bind context");
             }
             return new ArrayBindReader(name, context.authoredName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name),

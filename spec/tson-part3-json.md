@@ -87,6 +87,8 @@ An implementation MAY be encode-only or decode-only; each side's obligations sta
 
 **Equivalence with the text encoding.** The two encodings carry the same model. For every schema and every value the JSON encoding can carry (§4.3), decode-from-JSON and decode-from-text MUST produce equivalent decoded output — same fields, same marks resolved, same host values under each atom's contract. The encodings differ in what they can carry (annotations, §4.3) and in spelling latitude (radix, quote forms), never in the meaning of what both carry.
 
+The rule reaches bound output (§9.1). Which host type a binding — a binding map ([TSON-SCHEMA] §8.2), or whatever a processor binds by — chooses for an entry is the processor's; which encoding a value arrived in is not an input to it. Under one binding, both encodings bind every value the JSON encoding can carry to the same host value: a host type that holds a value read from text holds the same value read from JSON. A reading that let the binding vary by encoding would make a host type's validity a property of the wire, so a deployment could not change encoding without changing its classes.
+
 
 ### 1.6 The Type-System Changes This Document Consumes
 
