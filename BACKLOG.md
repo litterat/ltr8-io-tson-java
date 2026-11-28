@@ -532,17 +532,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
   Move them out of the main sources, to the test sources or an examples source set the tests depend on, drop the
   export, and correct the `tson-java` skill's `api.md`, which lists it.
-- [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
-  `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
-  reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, so
-  `@Unbound` on an explicit canonical constructor's parameter is unbound to the binder and missed by both readers; the
-  first takes the name from the accessor's `@Field` alone and tests it with `isEmpty` where the binder uses `isBlank`,
-  the second uses Java names, and both answer nothing for a class that is no record. Both loop over
-  `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the descriptor, or
-  delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter in each stack. In
-  the same two modules, `DataClassObjectWriter.writeUnion` and the JSON root write look a member up by
-  `value.getClass()`, which for an enum constant with a body is its anonymous class, no member of any union (read, not
-  run): use `getDeclaringClass()` for an enum, as the two mappers do.
 - [ ] **A method parameter's binding annotation is never read.** `setX(@Field("y") String x)` on a `@Record`
   getter/setter class binds the component as "x" and drops the annotation, silently (reproduced by probe): the member
   scan does not reach a method's parameters on a described class. Take a setter's parameter as a member of its
