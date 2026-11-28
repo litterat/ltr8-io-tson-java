@@ -154,6 +154,10 @@ public class AtomBinder {
 							+ "a String or a BigInteger/BigDecimal -- and takes %s", targetClass.getName(),
 							Arrays.toString(constructor.getParameterTypes()));
 				}
+				if (Modifier.isAbstract(targetClass.getModifiers())) {
+					throw refusal("%s is abstract, so %s, marked @Atom, cannot build it: an abstract class's way in is "
+							+ "a static method", targetClass.getName(), describe(constructor));
+				}
 				waysIn.add(constructor);
 			}
 		}

@@ -23,6 +23,7 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.AtomForms.AbstractWithAtomConstructor;
 import io.ltr8.test.data.AtomForms.AccessorBesideToData;
 import io.ltr8.test.data.AtomForms.AccessorOfAnotherType;
 import io.ltr8.test.data.AtomForms.AccessorTakingAParameter;
@@ -294,6 +295,13 @@ class AtomFormTest {
 		String atom = ConstructorNotPublic.class.getName();
 		assertEquals(atom + " is bound through a member that is not accessible: constructor " + atom
 				+ "(java.lang.String), which is not public", refusal(ConstructorNotPublic.class));
+	}
+
+	@Test
+	void aConstructorOfAnAbstractClassIsRefused() {
+		String atom = AbstractWithAtomConstructor.class.getName();
+		assertEquals(atom + " is abstract, so constructor " + atom + "(java.lang.String), marked @Atom, cannot build "
+				+ "it: an abstract class's way in is a static method", refusal(AbstractWithAtomConstructor.class));
 	}
 
 	@Test

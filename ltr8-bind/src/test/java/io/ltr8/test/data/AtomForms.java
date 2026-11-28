@@ -465,6 +465,21 @@ public final class AtomForms {
 		}
 	}
 
+	public abstract static class AbstractWithAtomConstructor {
+
+		private final String code;
+
+		@Atom
+		public AbstractWithAtomConstructor(String code) {
+			this.code = code;
+		}
+
+		@Atom
+		public String code() {
+			return code;
+		}
+	}
+
 	public static final class ConstructorNotPublic {
 
 		private final String code;
