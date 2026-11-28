@@ -24,9 +24,13 @@ import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.BridgedFields.AbstractBaseBridge;
 import io.ltr8.test.data.BridgedFields.Constructed;
+import io.ltr8.test.data.BridgedFields.DefaultNumberBridge;
 import io.ltr8.test.data.BridgedFields.DirectBridge;
 import io.ltr8.test.data.BridgedFields.GenericInterfaceFirstBridge;
 import io.ltr8.test.data.BridgedFields.GetterSetter;
+import io.ltr8.test.data.BridgedFields.HiddenBaseParsedNumberBridge;
+import io.ltr8.test.data.BridgedFields.LongWireBridge;
+import io.ltr8.test.data.BridgedFields.ParsedNumberBridge;
 import io.ltr8.test.data.BridgedFields.PlainInterfaceFirstBridge;
 import io.ltr8.test.data.BridgedFields.PublicField;
 import io.ltr8.test.data.BridgedFields.RecordedConstructed;
@@ -36,6 +40,7 @@ import io.ltr8.test.data.BridgedFields.RecordingNumberAsText;
 import io.ltr8.test.data.BridgedFields.SubInterfaceBridge;
 import io.ltr8.test.data.BridgedFields.SubclassedBridge;
 import io.ltr8.test.data.BridgedFields.TwoHopBridge;
+import io.ltr8.test.data.BridgedFields.TwoLevelsParsedNumberBridge;
 import io.ltr8.test.data.BridgedFields.TwoRecordedFields;
 import org.junit.jupiter.api.Test;
 
@@ -242,6 +247,43 @@ class BridgedFieldTest {
 	@Test
 	void aBridgeImplementingASubInterfaceOfDataBridgeRoundTripsThroughBothMappers() throws Throwable {
 		assertBridgedCountRoundTrips(SubInterfaceBridge.class);
+	}
+
+	@Test
+	void aBridgeInheritingItsMethodsFromAGenericAbstractClassRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(ParsedNumberBridge.class);
+	}
+
+	@Test
+	void aBridgeInheritingItsMethodsTwoGenericClassesUpRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(TwoLevelsParsedNumberBridge.class);
+	}
+
+	@Test
+	void aBridgeInheritingItsMethodsFromAClassThePublicLookupCannotAccessRoundTripsThroughBothMappers()
+			throws Throwable {
+		assertBridgedCountRoundTrips(HiddenBaseParsedNumberBridge.class);
+	}
+
+	@Test
+	void aBridgeInheritingItsMethodsAsDefaultMethodsOfAGenericInterfaceRoundTripsThroughBothMappers()
+			throws Throwable {
+		assertBridgedCountRoundTrips(DefaultNumberBridge.class);
+	}
+
+	@Test
+	void aBridgeToABoxedPrimitiveInheritingItsMethodsRoundTripsThroughBothMappers() throws Throwable {
+		DataClassRecord record = assertInstanceOf(DataClassRecord.class, context.getDescriptor(LongWireBridge.class));
+		assertEquals(Long.class, record.fields()[0].type());
+		LongWireBridge value = new LongWireBridge(42);
+
+		MapMapper maps = new MapMapper(context);
+		assertEquals(Map.of("count", 42L), maps.toMap(value));
+		assertEquals(value, maps.toObject(LongWireBridge.class, maps.toMap(value)));
+
+		ArrayMapper arrays = new ArrayMapper(context);
+		assertArrayEquals(new Object[] { 42L }, arrays.toArray(value));
+		assertEquals(value, arrays.toObject(LongWireBridge.class, arrays.toArray(value)));
 	}
 
 	@Test

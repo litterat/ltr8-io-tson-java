@@ -687,19 +687,21 @@ public class ArrayMapper {
 
 			Object[] unionPair = new Object[2];
 			if (v != null) {
-				unionPair[0] = v.getClass().getName();
+				// A constant with a body is an instance of the body's class, and a member as its enum.
+				Class<?> memberClass = v instanceof Enum<?> constant ? constant.getDeclaringClass() : v.getClass();
+				unionPair[0] = memberClass.getName();
 
-				ArrayFunctions function = typeMap.get(v.getClass());
+				ArrayFunctions function = typeMap.get(memberClass);
 				if (function == null) {
 
-					DataClass dataClass = context.getDescriptor(v.getClass());
+					DataClass dataClass = context.getDescriptor(memberClass);
 
 					if (!unionClass.isMemberType(dataClass.typeClass())) {
 						throw new DataBindException("Class not of union type");
 					}
 
 					function = getFunctions(dataClass);
-					typeMap.put(v.getClass(), function);
+					typeMap.put(memberClass, function);
 				}
 
 				try {

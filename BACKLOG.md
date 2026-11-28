@@ -533,21 +533,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   public: …HiddenRecord.text[Ljava.lang.Object;@38f57b3d/…" from `RecordComponentFinder`, a different hash in each
   context. `AtomBinder` and `TransparentBinder` unreflect too (read, not run). Look each member up by name and type
   through `Members`, as `RecordBinder` does its constructor, and assert each whole message in `RecordRefusalTest`.
-- [ ] **A sealed class that is not abstract is no member of its own union.** `UnionBinder.collectSealedMembers`
-  lists the leaves of a sealed hierarchy, so a concrete sealed class at the root or between is no member and its
-  own instances cannot be written as union values. An enum with a constant body is such a class: its union lists the
-  anonymous body class alone, and its other constants are no member. Read, not run, beyond a probe of the JDK's
-  answer for the enum. List a sealed class that can be instantiated beside the classes it permits, with a round trip
-  of a concrete sealed root and of each constant of such an enum.
+- [ ] **A concrete sealed class whose own descriptor is the union cannot be written as itself.** A sealed class that
+  can be instantiated and is described as a union, the root of a hierarchy or one between that is no `@Record`,
+  `@Tuple` or `@Transparent`, is no member of that union, and an instance of it is refused by both mappers ("Class not
+  of union type"): its one descriptor is the `DataClassUnion`, which names its members and cannot describe the class
+  as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
+  it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
+  `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
 - [ ] **`TupleBinder` reaches a record through `ltr8-bind`'s own lookup.** It uses `MethodHandles.lookup()` where
   every other binder uses the public lookup, so what a `@Tuple` record may hide differs from what a record may.
   Read, not run. Reach its constructor and accessors through `Members`, with a case in `RecordRefusalTest` for a
   `@Tuple` record the public lookup cannot reach.
-- [ ] **A `@Field` bridge inheriting a generic `toData` may be refused.** `RecordFields.fieldBridge` looks up
-  `toData` and `toObject` on the bridge class at the resolved types, and a bridge that inherits both from a generic
-  super class (`IntegerBridge extends AbstractBridge<Integer>`) declares only the erased signatures. Read, not run.
-  Reproduce it, find the methods at their erased types and adapt the handles, with a round trip in
-  `BridgedFieldTest`.
 - [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
   ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
   `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
