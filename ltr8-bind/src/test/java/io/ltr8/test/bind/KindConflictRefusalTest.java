@@ -27,6 +27,9 @@ import io.ltr8.test.data.KindConflicts.ToDataUnion;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
 import io.ltr8.test.data.KindConflicts.SealedAbstractRecord;
 import io.ltr8.test.data.KindConflicts.SealedListed;
+import io.ltr8.test.data.KindConflicts.SealedMap;
+import io.ltr8.test.data.KindConflicts.UnionCollection;
+import io.ltr8.test.data.KindConflicts.UnionList;
 import io.ltr8.test.data.KindConflicts.SealedListingUnion;
 import io.ltr8.test.data.KindConflicts.SealedOpenUnion;
 import io.ltr8.test.data.KindConflicts.TransparentRecord;
@@ -112,6 +115,18 @@ class KindConflictRefusalTest {
 						+ ".class})" + remove),
 				described(SealedOpenUnion.class, "is sealed" + permits + "@Union(value = {}, sealed = false)"
 						+ remove));
+	}
+
+	@Test
+	void aUnionThatIsAContainerTooIsRefused() {
+		String union = ", so it could mean a union, written as one of its members, or ";
+		assertAll(
+				described(SealedMap.class, "is sealed and a java.util.Map" + union + "a map, written as its entries: "
+						+ "unseal it, or extend no java.util.Map"),
+				described(UnionCollection.class, "carries @Union and is a java.util.Collection" + union + "a "
+						+ "collection, written as its elements: remove @Union, or extend no java.util.Collection"),
+				described(UnionList.class, "carries @Union and is a java.util.Collection" + union + "a collection, "
+						+ "written as its elements: remove @Union, or extend no java.util.Collection"));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

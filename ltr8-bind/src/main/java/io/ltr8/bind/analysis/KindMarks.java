@@ -95,10 +95,11 @@ final class KindMarks {
 		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
 				Walk.ATOM, Walk.BRIDGED_RECORD));
 		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Set.of(Signal.MAP, Signal.COLLECTION), Walk.UNREAD,
+				Walk.ATOM));
 		RESOLVED.put(Kind.ATOM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
-		RESOLVED.put(Kind.MAP, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
-		RESOLVED.put(Kind.ARRAY, reading(all, Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.MAP, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ARRAY, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.NONE, reading(but(all, Signal.UNION), Set.of()));
 
 		REGISTERED.put(Kind.ENUM, RESOLVED.get(Kind.ENUM));
@@ -235,6 +236,9 @@ final class KindMarks {
 
 	private static DataBindException excluded(Kind kind, ClassSignals signals) {
 		Class<?> type = signals.type();
+		if (kind == Kind.UNION) {
+			return container(signals);
+		}
 		if (kind != Kind.RECORD) {
 			throw new IllegalStateException(kind + " excludes no fact " + type.getName() + " has");
 		}
@@ -263,6 +267,9 @@ final class KindMarks {
 					+ "of them", type.getName(), label(own, type), WAYS.get(own), label(mark, type), WAYS.get(mark)));
 		}
 		if (mark == Signal.UNION) {
+			if (signals.has(Signal.MAP) || signals.has(Signal.COLLECTION)) {
+				return container(signals);
+			}
 			if (kind == Kind.BRIDGED && signals.has(Signal.ABSTRACT)) {
 				return new CodeAnalysisException(String.format("%s carries @Union, a union of its members, but "
 						+ "implements ToData, bridged to the record class it names: remove one of them", type.getName()));
@@ -285,6 +292,18 @@ final class KindMarks {
 			};
 		}
 		throw new IllegalStateException(kind + " reads " + mark + " of " + type.getName());
+	}
+
+	/** Refuses a sealed or {@code @Union} type that is a map or a collection too. */
+	private static DataBindException container(ClassSignals signals) {
+		Class<?> type = signals.type();
+		boolean map = signals.has(Signal.MAP);
+		String container = map ? "java.util.Map" : "java.util.Collection";
+		String marked = signals.has(Signal.SEALED) ? "is sealed and a " : "carries @Union and is a ";
+		String fix = signals.has(Signal.SEALED) ? "unseal it" : "remove @Union";
+		return new CodeAnalysisException(String.format("%s %s%s, so it could mean a union, written as one of its "
+				+ "members, or %s: %s, or extend no %s", type.getName(), marked, container,
+				map ? "a map, written as its entries" : "a collection, written as its elements", fix, container));
 	}
 
 	/** How each mark that says how a record is written says it, completing "{@code type} is written ...". */

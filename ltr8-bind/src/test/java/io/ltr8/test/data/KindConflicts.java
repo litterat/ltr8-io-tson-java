@@ -15,6 +15,11 @@
  */
 package io.ltr8.test.data;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
 import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
@@ -155,5 +160,21 @@ public final class KindConflicts {
 	}
 
 	public record SealedOpened(String value) implements SealedOpenUnion {
+	}
+
+	// --- a union that is a container too
+
+	public sealed interface SealedMap extends Map<String, String> permits SealedMapMember {
+	}
+
+	public static final class SealedMapMember extends HashMap<String, String> implements SealedMap {
+	}
+
+	@Union
+	public interface UnionCollection extends Collection<String> {
+	}
+
+	@Union
+	public static class UnionList extends ArrayList<String> {
 	}
 }

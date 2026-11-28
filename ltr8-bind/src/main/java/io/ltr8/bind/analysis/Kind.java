@@ -54,7 +54,8 @@ enum Kind {
 	 *     way in. One that marks one is an atom, and {@code ToData} at most its way out.
 	 * <li>{@link #ENUM}, which needs no mark: {@code isEnum} is as plain a JDK fact as {@code isRecord}. Asked ahead
 	 *     of a union, since the JDK seals an enum with a constant body.
-	 * <li>{@link #UNION}: sealed, or abstract and marked {@code @Union}; never a collection.
+	 * <li>{@link #UNION}: sealed, or abstract and marked {@code @Union}, a map or a collection too.
+	 *     {@link KindMarks} refuses one that is: it could mean either.
 	 * <li>{@link #ATOM}: a primitive, or {@code @Atom} on the type, a constructor or a static method. An instance
 	 *     method marked {@code @Atom} is a way out, which a class of any kind may inherit, so it decides nothing.
 	 * <li>{@link #MAP}, then {@link #ARRAY}.
@@ -81,8 +82,7 @@ enum Kind {
 		if (signals.contains(Signal.ENUM)) {
 			return ENUM;
 		}
-		if (!signals.contains(Signal.COLLECTION) && (signals.contains(Signal.SEALED)
-				|| signals.contains(Signal.UNION) && signals.contains(Signal.ABSTRACT))) {
+		if (signals.contains(Signal.SEALED) || signals.contains(Signal.UNION) && signals.contains(Signal.ABSTRACT)) {
 			return UNION;
 		}
 		if (signals.contains(Signal.PRIMITIVE) || marksAtom) {

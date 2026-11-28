@@ -160,9 +160,9 @@ class KindTest {
 	}
 
 	@Test
-	void collectionIsNeverAUnion() {
-		assertEquals(Kind.ARRAY, of(SEALED, INTERFACE, ABSTRACT, COLLECTION));
-		assertEquals(Kind.ARRAY, of(UNION, INTERFACE, ABSTRACT, COLLECTION));
+	void sealedOrMarkedCollectionIsAUnion() {
+		assertEquals(Kind.UNION, of(SEALED, INTERFACE, ABSTRACT, COLLECTION));
+		assertEquals(Kind.UNION, of(UNION, INTERFACE, ABSTRACT, COLLECTION));
 	}
 
 	@Test
