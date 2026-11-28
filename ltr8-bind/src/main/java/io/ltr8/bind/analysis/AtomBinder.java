@@ -1,6 +1,7 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Atom;
+import io.ltr8.annotation.ToData;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -10,13 +11,21 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class AtomBinder {
 
@@ -53,99 +62,191 @@ public class AtomBinder {
 		return type.isPrimitive() || BOXED_SCALARS.contains(type);
 	}
 
+	/** A way out: the method an atom is written through, and the value it returns. */
+	private record WayOut(Method method, Class<?> value, String described) {
+	}
+
+	/**
+	 * Whether {@code targetClass} carries {@code @Atom} itself or on a constructor or static method it declares,
+	 * which {@link #resolveAtom} applies or refuses.
+	 */
+	static boolean marksAtom(Class<?> targetClass) {
+		if (targetClass.isAnnotationPresent(Atom.class)) {
+			return true;
+		}
+		for (Constructor<?> constructor : targetClass.getDeclaredConstructors()) {
+			if (constructor.isAnnotationPresent(Atom.class)) {
+				return true;
+			}
+		}
+		for (Method method : targetClass.getDeclaredMethods()) {
+			if (isMarkedStatic(method)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean isMarkedStatic(Method method) {
+		return Modifier.isStatic(method.getModifiers()) && !method.isSynthetic()
+				&& method.isAnnotationPresent(Atom.class);
+	}
+
+	/**
+	 * The atom {@code targetClass} says it is, or {@code null} where it neither carries {@code @Atom} nor marks a way
+	 * in. A static way in is the class's own, since a super class's returns the super class; a way out may be
+	 * inherited.
+	 */
 	public DataClassAtom resolveAtom(DataBindContext context, Class<?> targetClass)
 			throws CodeAnalysisException {
-		DataClassAtom descriptor = null;
-
-		try {
-			if (targetClass.isPrimitive()) {
-				// Should not get here unless primitives not registered.
-				throw new CodeAnalysisException("Primitive not registered: " + targetClass.getName());
-			}
-
-			// Check for annotation on constructor.
-			Constructor<?>[] constructors = targetClass.getConstructors();
-			for (Constructor<?> constructor : constructors) {
-				Atom atomAnnotation = constructor
-						.getAnnotation(Atom.class);
-				if (atomAnnotation != null) {
-					Parameter[] params = constructor.getParameters();
-					if (params.length != 1 || !isWireScalar(params[0].getType())) {
-						throw new CodeAnalysisException(String.format(
-								"@Atom constructor of %s must take one value the wire carries -- a primitive, a box, "
-										+ "a String or a BigInteger/BigDecimal -- and takes %s",
-								targetClass.getName(), Arrays.toString(constructor.getParameterTypes())));
-					}
-
-					Class<?> dataClass = params[0].getType();
-
-					MethodHandle toObject = Members.constructor(targetClass, constructor);
-
-					// TODO Should do additional checks. Is return type same as constructor type.
-					// Also should check for ToData interface implementation or @Atom on specific
-					// method as could be different ways to say which method is toData.
-					Method toDataMethod = targetClass.getDeclaredMethod(TODATA_METHOD);
-
-					MethodHandle toData = Members.virtual(targetClass, toDataMethod);
-
-					DataClassBridge bridge = new DataClassBridge(dataClass, toData, toObject);
-					descriptor = new DataClassAtom(targetClass, bridge);
-					break;
-				}
-			}
-
-			// This is to look at static methods
-			Method[] methods = targetClass.getDeclaredMethods();
-			for (Method method : methods) {
-
-				Atom atomAnnotation = method
-						.getAnnotation(Atom.class);
-				if (Modifier.isStatic(method.getModifiers()) && atomAnnotation != null) {
-					Parameter[] params = method.getParameters();
-					if (params.length != 1 || !isWireScalar(params[0].getType())) {
-						throw new CodeAnalysisException(String.format(
-								"@Atom static factory %s.%s must take one value the wire carries -- a primitive, a box, "
-										+ "a String or a BigInteger/BigDecimal -- and takes %s",
-								targetClass.getName(), method.getName(),
-								Arrays.toString(method.getParameterTypes())));
-					}
-
-					MethodHandle toObject = Members.staticMethod(targetClass, method);
-
-					Class<?> param = params[0].getType();
-
-					MethodHandle toData = null;
-					// Requires an accessor with the same type.
-					for (Method accessorMethod : methods) {
-
-						Atom accessorAtom = accessorMethod
-								.getAnnotation(Atom.class);
-						if (accessorAtom != null && !Modifier.isStatic(accessorMethod.getModifiers())) {
-							if (accessorMethod.getReturnType() != param) {
-								throw new CodeAnalysisException(
-										"Atom accessor method must have a single primitive value as same type as static constructor");
-							}
-							toData = Members.virtual(targetClass, accessorMethod);
-							break;
-						}
-
-					}
-
-					if (toData == null) {
-						throw new CodeAnalysisException("Atom accessor @Atom annotation not found");
-					}
-
-					DataClassBridge bridge = new DataClassBridge(param, toData, toObject);
-					descriptor = new DataClassAtom(targetClass, bridge);
-
-				}
-			}
-
-		} catch (SecurityException | NoSuchMethodException | CodeAnalysisException e) {
-			throw new CodeAnalysisException("Failed to get atom descriptor", e);
+		if (targetClass.isPrimitive()) {
+			// Should not get here unless primitives not registered.
+			throw new CodeAnalysisException("Primitive not registered: " + targetClass.getName());
 		}
 
-		return descriptor;
+		List<Executable> waysIn = waysIn(targetClass);
+		if (waysIn.isEmpty()) {
+			if (targetClass.isAnnotationPresent(Atom.class)) {
+				throw refusal("%s carries @Atom and marks no constructor or static method @Atom: an atom's way in is "
+						+ "one public constructor or public static method marked @Atom, taking a value the wire "
+						+ "carries", targetClass.getName());
+			}
+			return null;
+		}
+		if (waysIn.size() > 1) {
+			throw refusal("%s marks two ways in @Atom, %s and %s: an atom has one", targetClass.getName(),
+					describe(waysIn.get(0)), describe(waysIn.get(1)));
+		}
+		Executable wayIn = waysIn.getFirst();
+		Class<?> value = wayIn.getParameterTypes()[0];
+
+		List<WayOut> waysOut = waysOut(targetClass);
+		if (waysOut.isEmpty()) {
+			throw refusal("%s marks %s @Atom, its way in, and says no way out: mark the public instance method "
+					+ "returning %s @Atom, or implement ToData<%s>", targetClass.getName(), describe(wayIn),
+					value.getName(), box(value).getName());
+		}
+		if (waysOut.size() > 1) {
+			throw refusal("%s says two ways out, %s and %s: an atom has one", targetClass.getName(),
+					waysOut.get(0).described(), waysOut.get(1).described());
+		}
+		WayOut wayOut = waysOut.getFirst();
+		if (box(value) != box(wayOut.value())) {
+			throw refusal("%s's way in %s takes %s and its way out %s returns %s: both halves of an atom carry one "
+					+ "value", targetClass.getName(), describe(wayIn), value.getName(), wayOut.described(),
+					wayOut.value().getName());
+		}
+
+		MethodHandle toObject = wayIn instanceof Constructor<?> constructor
+				? Members.constructor(targetClass, constructor)
+				: Members.staticMethod(targetClass, (Method) wayIn);
+		MethodHandle toData = Members.virtual(targetClass, wayOut.method())
+				.asType(MethodType.methodType(value, targetClass));
+		return new DataClassAtom(targetClass, new DataClassBridge(value, toData, toObject));
+	}
+
+	private static List<Executable> waysIn(Class<?> targetClass) throws CodeAnalysisException {
+		List<Executable> waysIn = new ArrayList<>();
+		for (Constructor<?> constructor : targetClass.getDeclaredConstructors()) {
+			if (constructor.isAnnotationPresent(Atom.class)) {
+				if (!takesOneWireValue(constructor)) {
+					throw refusal("@Atom constructor of %s must take one value the wire carries -- a primitive, a box, "
+							+ "a String or a BigInteger/BigDecimal -- and takes %s", targetClass.getName(),
+							Arrays.toString(constructor.getParameterTypes()));
+				}
+				waysIn.add(constructor);
+			}
+		}
+		for (Method method : targetClass.getDeclaredMethods()) {
+			if (isMarkedStatic(method)) {
+				if (!takesOneWireValue(method)) {
+					throw refusal("@Atom static factory %s.%s must take one value the wire carries -- a primitive, a "
+							+ "box, a String or a BigInteger/BigDecimal -- and takes %s", targetClass.getName(),
+							method.getName(), Arrays.toString(method.getParameterTypes()));
+				}
+				if (method.getReturnType() != targetClass) {
+					throw refusal("%s marks %s @Atom, which returns %s: a static way in returns %1$s",
+							targetClass.getName(), describe(method), method.getReturnType().getTypeName());
+				}
+				waysIn.add(method);
+			}
+		}
+		waysIn.sort(Comparator.comparing(AtomBinder::describe));
+		return waysIn;
+	}
+
+	private static boolean takesOneWireValue(Executable executable) {
+		return executable.getParameterCount() == 1 && isWireScalar(executable.getParameterTypes()[0]);
+	}
+
+	/**
+	 * The instance methods marked {@code @Atom} that {@code targetClass} declares or inherits from a super class, each
+	 * once however often it is overridden, and its {@code ToData.toData()}, which is one of them where marked too.
+	 * Bridge methods are skipped: javac copies a method's annotations onto its bridges.
+	 */
+	private static List<WayOut> waysOut(Class<?> targetClass) throws CodeAnalysisException {
+		List<WayOut> waysOut = new ArrayList<>();
+		Set<String> marked = new HashSet<>();
+		Map<TypeVariable<?>, Type> inherited = TypeArguments.inherited(targetClass);
+		for (Class<?> declarer = targetClass; declarer != null; declarer = declarer.getSuperclass()) {
+			for (Method method : declarer.getDeclaredMethods()) {
+				if (Modifier.isStatic(method.getModifiers()) || method.isBridge() || method.isSynthetic()
+						|| !method.isAnnotationPresent(Atom.class)) {
+					continue;
+				}
+				if (method.getParameterCount() != 0) {
+					throw refusal("%s marks %s @Atom, which takes parameters: an instance method marked @Atom is the "
+							+ "way out, and takes none", targetClass.getName(), describe(method));
+				}
+				if (marked.add(method.getName())) {
+					Class<?> value = TypeArguments.erasure(
+							TypeArguments.substitute(method.getGenericReturnType(), inherited));
+					waysOut.add(new WayOut(method, value, describe(method) + " marked @Atom"));
+				}
+			}
+		}
+		if (ToData.class.isAssignableFrom(targetClass)) {
+			Type[] arguments = TypeArguments.arguments(targetClass, ToData.class);
+			if (arguments == null) {
+				throw refusal("%s implements ToData raw: a way out through ToData names the value it returns, "
+						+ "ToData<S>", targetClass.getName());
+			}
+			if (!(arguments[0] instanceof Class<?> value)) {
+				throw refusal("%s implements ToData<%s>: a way out through ToData names the value it returns by a "
+						+ "class", targetClass.getName(), arguments[0].getTypeName());
+			}
+			if (!marked.contains(TODATA_METHOD)) {
+				Method toData = toDataMethod(targetClass);
+				waysOut.add(new WayOut(toData, value, describe(toData) + " of ToData<" + value.getName() + ">"));
+			}
+		}
+		waysOut.sort(Comparator.comparing(WayOut::described));
+		return waysOut;
+	}
+
+	private static Method toDataMethod(Class<?> targetClass) {
+		try {
+			return targetClass.getMethod(TODATA_METHOD);
+		} catch (NoSuchMethodException e) {
+			// ToData declares toData() public, so every class implementing it has one.
+			throw new IllegalStateException(e);
+		}
+	}
+
+	private static Class<?> box(Class<?> type) {
+		return MethodType.methodType(type).wrap().returnType();
+	}
+
+	private static String describe(Executable executable) {
+		String parameters = Arrays.stream(executable.getParameterTypes()).map(Class::getTypeName)
+				.collect(Collectors.joining(", "));
+		String declarer = executable.getDeclaringClass().getName();
+		return executable instanceof Constructor<?> ? "constructor " + declarer + "(" + parameters + ")"
+				: "method " + declarer + "." + executable.getName() + "(" + parameters + ")";
+	}
+
+	private static CodeAnalysisException refusal(String format, Object... arguments) {
+		return new CodeAnalysisException(String.format(format, arguments));
 	}
 
 	/**

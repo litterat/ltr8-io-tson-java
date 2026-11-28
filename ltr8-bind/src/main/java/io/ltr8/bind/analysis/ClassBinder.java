@@ -1,7 +1,6 @@
 package io.ltr8.bind.analysis;
 
 
-import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
@@ -14,7 +13,6 @@ import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.bind.DataClassAnnotated;
@@ -113,8 +111,9 @@ public class ClassBinder {
 	 *
 	 * <p><b>What makes an atom an atom is a bridge to a type the wire can carry</b>, and the two routes a
 	 * class has for stating one are the two consulted here: a plain Java enum, whose representation is
-	 * settled by {@link AtomBinder#resolveEnum}, and {@code @Atom} on a constructor or static
-	 * factory. Both end in a {@link DataClassBridge} naming the wire type and the crossing back.
+	 * settled by {@link AtomBinder#resolveEnum}, and the way in and way out it marks, read by
+	 * {@link AtomBinder#resolveAtom}. Both end in a {@link DataClassBridge} naming the wire type and the crossing
+	 * back; a class carrying {@code @Atom} that says either badly is refused here as it is by {@link #resolve}.
 	 *
 	 * <p>Exposed for {@code DataBindContext.registerAtom}, so that registering a class as an atom finds the
 	 * form it already declares rather than replacing it with one that states nothing. {@link #resolve}
@@ -260,9 +259,8 @@ public class ClassBinder {
 			}
 		}
 
-		// Class has implemented ToData so exports/imports a data class (which must itself
-		// resolve to a real record or a hand-written one).
-		return ToData.class.isAssignableFrom(targetClass);
+		// A ToData class marking @Atom is an atom, and ToData at most its way out; any other is bridged to its record.
+		return ToData.class.isAssignableFrom(targetClass) && !AtomBinder.marksAtom(targetClass);
     }
 
 	private boolean isArray(Class<?> targetClass) {
@@ -279,38 +277,7 @@ public class ClassBinder {
 	}
 
 	private boolean isAtom(Class<?> targetClass) {
-
-		if (targetClass.isPrimitive()) {
-			return true;
-		}
-
-		// Check for class annoation
-		Atom atomAnnotation = targetClass
-				.getAnnotation(Atom.class);
-		if (atomAnnotation != null) {
-			return true;
-		}
-
-		// Check for annotation on constructor.
-		Constructor<?>[] constructors = targetClass.getConstructors();
-		for (Constructor<?> constructor : constructors) {
-			atomAnnotation = constructor.getAnnotation(Atom.class);
-			if (atomAnnotation != null) {
-				return true;
-			}
-		}
-
-		// This is to look at static methods
-		Method[] methods = targetClass.getDeclaredMethods();
-		for (Method method : methods) {
-
-			atomAnnotation = method.getAnnotation(Atom.class);
-			if (Modifier.isStatic(method.getModifiers()) && atomAnnotation != null) {
-				return true;
-			}
-		}
-
-		return false;
+		return targetClass.isPrimitive() || AtomBinder.marksAtom(targetClass);
 	}
 
 }
