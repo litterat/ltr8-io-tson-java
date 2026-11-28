@@ -540,9 +540,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
   (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
   up as itself, naming the class.
-- [ ] **`DataBindContext.registerAtom` unreflects a user bridge.** A bridge the public lookup cannot reach is refused
-  with "Failed to register atom bridge", naming no class, over a cause whose text carries an identity hash. Read, not
-  run. Look `toData` and `toObject` up by name and type, as `RecordFields.fieldBridge` does, and name the bridge.
 - [ ] **A binding annotation is still ignored in positions the member scan does not reach.**
   `IgnoredAnnotationRefusalTest` holds that `@Field`, `@Union` or `@Unbound` is applied or the class refused, for the
   fields and methods of a described class. Not scanned: a super class's annotated method that a subclass overrides
