@@ -182,6 +182,7 @@ final class RecordFields {
 		String fieldName = info.getWireName();
 
 		Class<?> unionClass = info.getType();
+		ClassBinder.refuseBlankTypename(unionClass);
 
 		if (union.value() == null || union.value().length == 0) {
 			throw new CodeAnalysisException("Union annotation must have one or more classes");

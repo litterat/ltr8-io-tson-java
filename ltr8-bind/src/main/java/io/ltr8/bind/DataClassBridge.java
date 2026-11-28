@@ -16,12 +16,30 @@ public class DataClassBridge {
     // Converts from dataClass -> typeClass.
     private final MethodHandle toObject;
 
+    private final boolean transparent;
+
     public DataClassBridge(Class<?> serialType, MethodHandle toData,
                          MethodHandle toObject) {
+        this(serialType, toData, toObject, false);
+    }
 
+    private DataClassBridge(Class<?> serialType, MethodHandle toData, MethodHandle toObject, boolean transparent) {
         this.dataClass = serialType;
         this.toData = toData;
         this.toObject = toObject;
+        this.transparent = transparent;
+    }
+
+    /**
+     * The bridge a {@code @Transparent} class crosses to its one component by, which makes the descriptor carrying
+     * it {@link DataClass#isTransparent}.
+     */
+    public static DataClassBridge transparent(Class<?> component, MethodHandle toData, MethodHandle toObject) {
+        return new DataClassBridge(component, toData, toObject, true);
+    }
+
+    boolean isTransparent() {
+        return transparent;
     }
 
     /**

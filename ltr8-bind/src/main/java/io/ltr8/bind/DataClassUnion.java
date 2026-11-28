@@ -32,11 +32,9 @@ import java.util.Objects;
  *
  * <p>Members are held as {@link Class} rather than as {@link DataClass}, and not to break a resolution
  * cycle -- {@link DataBindContext#componentSource} defers a cyclic edge and the holder memoises it, which
- * is what {@code DataClassField} already does. Two other reasons stand: {@link #addMemberType} grows the
- * list while a document is being read, where resolving a descriptor would put analysis inside a lock on a
- * read path; and every caller matching a wire name asks a reflective question the {@code Class} answers
- * and a {@code DataClass} does not carry -- {@code @Typename}, the simple name. A caller that wants the
- * descriptor asks the context for it, which caches.
+ * is what {@code DataClassField} already does. The reason that stands is that {@link #addMemberType} grows
+ * the list while a document is being read, where resolving a descriptor would put analysis inside a lock on
+ * a read path. A caller that wants a member's descriptor asks the context for it, which caches.
  */
 public class DataClassUnion extends DataClass {
 

@@ -6,6 +6,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Tuple;
+import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -125,6 +126,7 @@ public class ClassBinder {
 	 * reaching it means the primitives were never registered.
 	 */
 	public DataClassAtom atomForm(DataBindContext context, Class<?> targetClass) throws CodeAnalysisException {
+		refuseBlankTypename(targetClass);
 		if (targetClass.isPrimitive()) {
 			return null;
 		}
@@ -136,12 +138,26 @@ public class ClassBinder {
 
 	/** The form {@code DataBindContext.registerAtom} gives {@code targetClass} through {@code bridge}. */
 	public DataClassBridge atomBridge(Class<?> targetClass, DataBridge<?, ?> bridge) throws CodeAnalysisException {
+		refuseBlankTypename(targetClass);
 		return RecordFields.atomBridge(targetClass, bridge);
+	}
+
+	/**
+	 * Refuses a class whose {@link Typename} is blank, which declares no name and is not the absence of one. Every
+	 * class a descriptor describes passes here first: through {@link #resolve}, a registration, or an embedded union.
+	 */
+	static void refuseBlankTypename(Class<?> targetClass) throws CodeAnalysisException {
+		Typename typename = targetClass.getAnnotation(Typename.class);
+		if (typename != null && typename.name().isBlank()) {
+			throw new CodeAnalysisException(String.format("%s carries @Typename(name = \"%s\"), which is blank",
+					targetClass.getName(), typename.name()));
+		}
 	}
 
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
 
+		refuseBlankTypename(targetClass);
 		DataClass result = null;
 
 		// If this is a schema first situation then this will return a definition and the job is to bind to

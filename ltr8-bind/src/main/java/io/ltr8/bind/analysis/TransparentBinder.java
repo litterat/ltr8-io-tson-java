@@ -98,7 +98,7 @@ final class TransparentBinder {
         try {
             MethodHandle toData = Members.virtual(targetClass, component.getAccessor());
             MethodHandle toObject = Members.constructor(targetClass, targetClass.getConstructor(component.getType()));
-            return new DataClassBridge(component.getType(), toData, toObject);
+            return DataClassBridge.transparent(component.getType(), toData, toObject);
         } catch (NoSuchMethodException | CodeAnalysisException e) {
             throw new DataBindException(String.format(
                     "@Transparent record %s needs a public canonical constructor taking its one component (%s)",

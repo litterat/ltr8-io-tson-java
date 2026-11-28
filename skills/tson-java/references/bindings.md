@@ -247,7 +247,7 @@ against that schema's fields, and a disagreement is a `BindMismatchException`.
 
 | Annotation      | On                                  | Does                                                                  |
 | --------------- | ----------------------------------- | ----------------------------------------------------------------------- |
-| `@Typename`     | type, field, method, parameter      | the schema type name this class writes itself as                      |
+| `@Typename`     | type                                | the schema type name this class writes itself as                      |
 | `@Field("name")`| field, method, parameter            | override or supply the wire field name                                |
 | `@Record`       | constructor, type                   | marks the canonical constructor of a hand-written immutable class     |
 | `@Tuple`        | a genuine `record`                  | bind positionally (array-shaped) instead of by field name             |
@@ -257,7 +257,6 @@ against that schema's fields, and a disagreement is a `BindMismatchException`.
 | `@Profile`      | constructor                         | which binding profiles this constructor serves                        |
 | `@Unbound`      | record component, field, method, parameter | this component is the class's own; no schema field fills it    |
 | `@FieldOrder`   | type                                | the wire order, when the constructor's own is not what you want       |
-| `@Namespace`    | type, package                       | an external schema name for the class or package                      |
 
 `DataBridge` (the two-way conversion behind an `@Atom` or a registered host type) and `ToData` are
 interfaces in the same package, not annotations.
