@@ -1349,6 +1349,33 @@ class TsonObjectReaderTest {
         assertEquals(2, ((Square) h.shape()).side());
     }
 
+    /** Neither declares {@code !square}: {@code Square}'s own name is {@code sq}, so the simple name is not one. */
+    @Test
+    void aTagNotNamingATargetWithATypenameExpectsTheTypename() {
+        ReadException thrown = assertThrows(ReadException.class, () -> hosted.read("!square { side: 2 }", Square.class));
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, thrown.diagnostic().code());
+        assertEquals("a built-in type name or '!sq'", thrown.diagnostic().expected());
+    }
+
+    @Typename(name = "foo")
+    public record Declared(int n) implements Claimed {
+    }
+
+    public record Foo(int n) implements Claimed {
+    }
+
+    public sealed interface Claimed permits Foo, Declared {
+    }
+
+    public record ClaimedHolder(Claimed claimed) {
+    }
+
+    /** {@code Foo} is listed first and answers {@code !foo} by its simple name, but another member declares it. */
+    @Test
+    void aMembersDeclaredNameBeatsAnotherMembersSimpleName() throws DataBindException {
+        assertEquals(new Declared(1), hosted.read("{ claimed: !foo { n: 1 } }", ClaimedHolder.class).claimed());
+    }
+
     @Test
     void unionWithoutTypeAnnotationThrows() throws DataBindException {
         assertThrows(ReadException.class, () -> mapper.read("{ shape: { radius: 5 } }", ShapeHolder.class));
@@ -1405,6 +1432,44 @@ class TsonObjectReaderTest {
         // `circle` names a real class; what fails is that this union does not admit it.
         assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),
                 collected.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    @Union
+    public interface OpenMark {
+    }
+
+    public sealed interface SealedMark permits Tick, Cross {
+    }
+
+    public record Tick(int n) implements SealedMark {
+    }
+
+    public record Cross(int n) implements SealedMark, OpenMark {
+    }
+
+    public record SealedMarkHolder(SealedMark mark) {
+    }
+
+    public record OpenMarkHolder(OpenMark mark) {
+    }
+
+    /** Matching {@code !tick} among {@code SealedMark}'s members must not describe {@code Cross}, which joins it. */
+    @Test
+    void readingOneUnionLeavesWhatAnotherOpenUnionAdmitsUnchanged() {
+        assertEquals(openMarkOutcome(false), openMarkOutcome(true));
+    }
+
+    private static String openMarkOutcome(boolean sealedFirst) {
+        TsonObjectReader reader = new TsonObjectReader(DataBindContext.builder()
+                .registerAtoms(AtomContext.hostTypes()).build()).withHostTypes();
+        if (sealedFirst) {
+            reader.read("{ mark: !tick { n: 1 } }", SealedMarkHolder.class);
+        }
+        try {
+            return reader.read("{ mark: !cross { n: 1 } }", OpenMarkHolder.class).toString();
+        } catch (ReadException e) {
+            return e.diagnostic().code().toString();
+        }
     }
 
     @Test

@@ -38,6 +38,7 @@ import io.ltr8.tson.tree.TsonValue;
 import java.io.UncheckedIOException;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Writes one Java object at one {@link DataClass} descriptor into an emitter a caller already owns, and
@@ -488,6 +489,8 @@ public final class DataClassObjectWriter {
                 writeNamespace(members, writer, root);
                 continue;
             }
+            // The value's own class, not its descriptor's: an enum constant with a body is described by its enum, and
+            // the body's class carries no @Typename.
             Typename tag = held == null ? null : held.getClass().getAnnotation(Typename.class);
             write(held, held == null ? null : descriptorOf(held), writer,
                     tag == null ? null : tag.name());
@@ -534,8 +537,8 @@ public final class DataClassObjectWriter {
         // Naming the member is the whole of this method's own business; the tag goes to write()'s seam so
         // that the prologue around it -- bridge, annotated box, parsed value -- is the one every other
         // position gets, rather than a copy of part of it maintained here.
-        write(value, context.getDescriptor(memberClass), writer,
-                boundary == null ? memberTypeRef(memberClass) : tagAt(boundary, memberClass));
+        DataClass member = context.getDescriptor(memberClass);
+        write(value, member, writer, boundary == null ? memberTypeRef(member) : tagAt(boundary, memberClass));
     }
 
     /**
@@ -556,20 +559,21 @@ public final class DataClassObjectWriter {
     /**
      * The type-ref a union member writes for itself, or {@code null} for none.
      *
-     * <p>{@link Typename} if present, else the simple class name lowercased (not the {@code @Typename} value,
+     * <p>{@link DataClass#typeName} if present, else the simple class name lowercased (not the declared name,
      * which is used verbatim) -- matching this codebase's own convention of lowercase type-refs, and the read
      * side's case-insensitive fallback means either case reads back regardless.
      *
      * <p><b>A {@link Transparent} member writes none</b>, being framing rather than shape: it contributes no
-     * type-ref of its own and the value it wraps writes whatever head that value has. The cost is stated on
-     * the annotation -- with no tag written nothing selects such a member by tag on the way back in, so it
-     * round-trips only where a position declares it.
+     * type-ref of its own and the value it wraps writes whatever head that value has. The cost is stated on the
+     * annotation -- with no tag written nothing selects such a member by tag on the way back in, so it round-trips
+     * only where a position declares it. Asked of the class rather than {@link DataClass#isTransparent}, which a
+     * {@code @Transparent} class registered as an atom does not answer to.
      */
-    private static String memberTypeRef(Class<?> memberClass) {
-        if (memberClass.isAnnotationPresent(Transparent.class)) {
+    private static String memberTypeRef(DataClass member) {
+        if (member.typeClass().isAnnotationPresent(Transparent.class)) {
             return null;
         }
-        Typename tn = memberClass.getAnnotation(Typename.class);
-        return tn != null ? tn.name() : memberClass.getSimpleName().toLowerCase(Locale.ROOT);
+        Optional<String> declared = member.typeName();
+        return declared.isPresent() ? declared.get() : member.typeClass().getSimpleName().toLowerCase(Locale.ROOT);
     }
 }

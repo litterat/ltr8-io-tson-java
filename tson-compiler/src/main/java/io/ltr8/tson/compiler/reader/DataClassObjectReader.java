@@ -252,8 +252,8 @@ public final class DataClassObjectReader {
         String name = typeRef.get();
         if (BuiltinTypeVocabulary.lookup(name).isPresent()) {
             TypeTagCheck.notScalar(ctx, name, ctx.peek());
-        } else if (!(hostTypes && TypeTagCheck.names(target.typeClass(), name)) && !preserveUnknownTypeRefs) {
-            TypeTagCheck.unknown(ctx, name, target.typeClass(), hostTypes, TypeTagCheck.names(target.typeClass(), name));
+        } else if (!(hostTypes && TypeTagCheck.names(target, name)) && !preserveUnknownTypeRefs) {
+            TypeTagCheck.unknown(ctx, name, target, hostTypes, TypeTagCheck.names(target, name));
         }
     }
 
@@ -283,9 +283,9 @@ public final class DataClassObjectReader {
             }
             // Not a built-in: only a name the target class declares outright gets through -- see the class
             // Javadoc on why an atom position takes `declares` rather than `names`.
-            boolean declared = TypeTagCheck.declares(dataClass.typeClass(), typeRef.get());
+            boolean declared = TypeTagCheck.declares(dataClass, typeRef.get());
             if (!(hostTypes && declared) && !preserveUnknownTypeRefs) {
-                TypeTagCheck.unknown(ctx, typeRef.get(), dataClass.typeClass(), hostTypes, declared);
+                TypeTagCheck.unknown(ctx, typeRef.get(), dataClass, hostTypes, declared);
                 return null;
             }
         }
