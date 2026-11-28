@@ -32,6 +32,9 @@ public class AtomBinder {
 	private static final String TODATA_METHOD = "toData";
 	private static final String TOOBJECT_METHOD = "toObject";
 
+	private static final String NO_WAY_IN = "an atom's way in is one public constructor or public static method marked "
+			+ "@Atom, taking a value the wire carries";
+
 	public AtomBinder() {
 	}
 
@@ -93,9 +96,9 @@ public class AtomBinder {
 	}
 
 	/**
-	 * The atom {@code targetClass} says it is, or {@code null} where it neither carries {@code @Atom} nor marks a way
-	 * in. A static way in is the class's own, since a super class's returns the super class; a way out may be
-	 * inherited.
+	 * The atom {@code targetClass} says it is, or {@code null} where it carries {@code @Atom} on neither itself, a way
+	 * in nor a way out. A static way in is the class's own, since a super class's returns the super class; a way out
+	 * may be inherited.
 	 */
 	public DataClassAtom resolveAtom(DataBindContext context, Class<?> targetClass)
 			throws CodeAnalysisException {
@@ -107,9 +110,13 @@ public class AtomBinder {
 		List<Executable> waysIn = waysIn(targetClass);
 		if (waysIn.isEmpty()) {
 			if (targetClass.isAnnotationPresent(Atom.class)) {
-				throw refusal("%s carries @Atom and marks no constructor or static method @Atom: an atom's way in is "
-						+ "one public constructor or public static method marked @Atom, taking a value the wire "
-						+ "carries", targetClass.getName());
+				throw refusal("%s carries @Atom and marks no constructor or static method @Atom: " + NO_WAY_IN,
+						targetClass.getName());
+			}
+			List<WayOut> marked = markedWaysOut(targetClass);
+			if (!marked.isEmpty()) {
+				throw refusal("%s says a way out, %s, and marks no constructor or static method @Atom: " + NO_WAY_IN,
+						targetClass.getName(), marked.getFirst().described());
 			}
 			return null;
 		}
@@ -186,12 +193,34 @@ public class AtomBinder {
 		return executable.getParameterCount() == 1 && isWireScalar(executable.getParameterTypes()[0]);
 	}
 
+	/** The {@link #markedWaysOut}, and {@code targetClass}'s {@code ToData.toData()} where it is none of them. */
+	private static List<WayOut> waysOut(Class<?> targetClass) throws CodeAnalysisException {
+		List<WayOut> waysOut = markedWaysOut(targetClass);
+		if (ToData.class.isAssignableFrom(targetClass)) {
+			Type[] arguments = TypeArguments.arguments(targetClass, ToData.class);
+			if (arguments == null) {
+				throw refusal("%s implements ToData raw: a way out through ToData names the value it returns, "
+						+ "ToData<S>", targetClass.getName());
+			}
+			if (!(arguments[0] instanceof Class<?> value)) {
+				throw refusal("%s implements ToData<%s>: a way out through ToData names the value it returns by a "
+						+ "class", targetClass.getName(), arguments[0].getTypeName());
+			}
+			if (waysOut.stream().noneMatch(wayOut -> wayOut.method().getName().equals(TODATA_METHOD))) {
+				Method toData = toDataMethod(targetClass);
+				waysOut.add(new WayOut(toData, value, describe(toData) + " of ToData<" + value.getName() + ">"));
+			}
+		}
+		waysOut.sort(Comparator.comparing(WayOut::described));
+		return waysOut;
+	}
+
 	/**
 	 * The instance methods marked {@code @Atom} that {@code targetClass} declares or inherits from a super class, each
-	 * once however often it is overridden, and its {@code ToData.toData()}, which is one of them where marked too.
-	 * Bridge methods are skipped: javac copies a method's annotations onto its bridges.
+	 * once however often it is overridden. Bridge methods are skipped: javac copies a method's annotations onto its
+	 * bridges.
 	 */
-	private static List<WayOut> waysOut(Class<?> targetClass) throws CodeAnalysisException {
+	private static List<WayOut> markedWaysOut(Class<?> targetClass) throws CodeAnalysisException {
 		List<WayOut> waysOut = new ArrayList<>();
 		Set<String> marked = new HashSet<>();
 		Map<TypeVariable<?>, Type> inherited = TypeArguments.inherited(targetClass);
@@ -210,21 +239,6 @@ public class AtomBinder {
 							TypeArguments.substitute(method.getGenericReturnType(), inherited));
 					waysOut.add(new WayOut(method, value, describe(method) + " marked @Atom"));
 				}
-			}
-		}
-		if (ToData.class.isAssignableFrom(targetClass)) {
-			Type[] arguments = TypeArguments.arguments(targetClass, ToData.class);
-			if (arguments == null) {
-				throw refusal("%s implements ToData raw: a way out through ToData names the value it returns, "
-						+ "ToData<S>", targetClass.getName());
-			}
-			if (!(arguments[0] instanceof Class<?> value)) {
-				throw refusal("%s implements ToData<%s>: a way out through ToData names the value it returns by a "
-						+ "class", targetClass.getName(), arguments[0].getTypeName());
-			}
-			if (!marked.contains(TODATA_METHOD)) {
-				Method toData = toDataMethod(targetClass);
-				waysOut.add(new WayOut(toData, value, describe(toData) + " of ToData<" + value.getName() + ">"));
 			}
 		}
 		waysOut.sort(Comparator.comparing(WayOut::described));

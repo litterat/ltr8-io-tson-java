@@ -560,9 +560,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `registerAtom` reads it; and on an instance method of an interface, which an atom implementing it may or may not
   take as its way out. Rule on each: refuse it, as `ComponentAnnotations.refuseAtom` refuses `@Atom` on a class
   described as something else (`UnreadAtomRefusalTest`), or apply it, with a test either way.
-- [ ] **A record with `@Atom` on its accessor, registered as an atom, is a bare atom.** It marks no way in, so
-  `atomForm` returns `null` and `registerAtom(Class)` registers a `DataClassAtom` with no bridge, the mark ignored
-  (reproduced by probe). Refuse it, as a class carrying `@Atom` on its type with no way in is refused.
 - [ ] **`Members.declarerDownTo` walks an interface by `getSuperclass()`.** For a described interface and a method
   it inherits from a super-interface, the walk reaches `null` and throws `NullPointerException` (read, not run; no
   caller passes an interface). Walk the super-interfaces, or refuse an interface naming it.

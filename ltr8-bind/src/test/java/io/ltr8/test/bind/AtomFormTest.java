@@ -21,6 +21,7 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.bind.analysis.CodeAnalysisException;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.AtomForms.AbstractWithAtomConstructor;
@@ -29,6 +30,7 @@ import io.ltr8.test.data.AtomForms.AccessorOfAnotherType;
 import io.ltr8.test.data.AtomForms.AccessorTakingAParameter;
 import io.ltr8.test.data.AtomForms.BareToData;
 import io.ltr8.test.data.AtomForms.BoxedConstructorAndPrimitiveAccessor;
+import io.ltr8.test.data.AtomForms.CodeBase;
 import io.ltr8.test.data.AtomForms.ConstructorAndAccessor;
 import io.ltr8.test.data.AtomForms.ConstructorAndToData;
 import io.ltr8.test.data.AtomForms.ConstructorNotPublic;
@@ -39,6 +41,7 @@ import io.ltr8.test.data.AtomForms.FactoryReturningAnotherType;
 import io.ltr8.test.data.AtomForms.FactoryWithoutWayOut;
 import io.ltr8.test.data.AtomForms.Holder;
 import io.ltr8.test.data.AtomForms.InheritsMarkedAccessor;
+import io.ltr8.test.data.AtomForms.InheritsMarkedAccessorWithoutWayIn;
 import io.ltr8.test.data.AtomForms.InheritsToData;
 import io.ltr8.test.data.AtomForms.InheritsToDataThroughATypeArgument;
 import io.ltr8.test.data.AtomForms.Keys;
@@ -48,6 +51,7 @@ import io.ltr8.test.data.AtomForms.OpenToDataAtom;
 import io.ltr8.test.data.AtomForms.OutOfRange;
 import io.ltr8.test.data.AtomForms.Plain;
 import io.ltr8.test.data.AtomForms.RawToDataAtom;
+import io.ltr8.test.data.AtomForms.RecordWithAtomAccessor;
 import io.ltr8.test.data.AtomForms.RecordWithAtomConstructor;
 import io.ltr8.test.data.AtomForms.ToDataOfARecord;
 import io.ltr8.test.data.AtomForms.ToDataOfAnotherType;
@@ -63,6 +67,7 @@ import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -185,6 +190,11 @@ class AtomFormTest {
 	}
 
 	@Test
+	void aRecordMarkingAnAtomAccessorStaysARecord() throws DataBindException {
+		assertInstanceOf(DataClassRecord.class, context.getDescriptor(RecordWithAtomAccessor.class));
+	}
+
+	@Test
 	void aToDataClassMarkingNoWayInStaysABridgedRecord() {
 		assertEquals("Could not find constructor: class java.lang.String", refusal(ToDataWithoutAtom.class));
 	}
@@ -215,6 +225,19 @@ class AtomFormTest {
 				+ " carries @Atom and marks no constructor or static method @Atom: an atom's way in is one public "
 				+ "constructor or public static method marked @Atom, taking a value the wire carries",
 				refusal(type))));
+	}
+
+	/** Registered as an atom, a class marking a way out and no way in would be one with no bridge. */
+	@Test
+	void aWayOutAloneIsRefusedWhenRegisteredAsAnAtom() {
+		assertAll(Stream.of(RecordWithAtomAccessor.class, InheritsMarkedAccessorWithoutWayIn.class).flatMap(type -> {
+			String wayOut = (type == RecordWithAtomAccessor.class ? type : CodeBase.class).getName() + ".code()";
+			String refusal = type.getName() + " says a way out, method " + wayOut + " marked @Atom, and marks no "
+					+ "constructor or static method @Atom: an atom's way in is one public constructor or public static "
+					+ "method marked @Atom, taking a value the wire carries";
+			return Stream.of(1, 2).<Executable>map(run -> () -> assertEquals(
+					List.of(CodeAnalysisException.class.getName() + ": " + refusal, refusal), registration(type)));
+		}));
 	}
 
 	// --- refused: two ways in, or two ways out
@@ -332,6 +355,14 @@ class AtomFormTest {
 		} catch (DataBindException e) {
 			throw new AssertionError(e);
 		}
+	}
+
+	/** Registering {@code type} as an atom in a fresh context: the refusal's message and its causes'. */
+	private static List<String> registration(Class<?> type) {
+		IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+				() -> DataBindContext.builder().registerAtom(type).build());
+		return Stream.<Throwable>iterate(thrown, Objects::nonNull, Throwable::getCause).map(Throwable::getMessage)
+				.toList();
 	}
 
 	private static String refusal(Class<?> type) {
