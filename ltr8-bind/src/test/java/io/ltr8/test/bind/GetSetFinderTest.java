@@ -622,27 +622,17 @@ class GetSetFinderTest {
 
 	/** A private field of the described class belongs to no component a super class declares. */
 	@Test
-	void anUnboundPrivateFieldNamedAsAnInheritedPairLeavesThePairBound() throws Throwable {
-		DataClassRecord record = record(UnboundFieldBesideInheritedPair.class);
-		assertEquals(List.of("name:String set"), shape(record));
-		UnboundFieldBesideInheritedPair value = new UnboundFieldBesideInheritedPair();
-		value.setName("anchor");
-		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
-		for (UnboundFieldBesideInheritedPair copy : roundTrips(value)) {
-			assertEquals("anchor", copy.getName());
-		}
+	void anUnboundPrivateFieldNamedAsAnInheritedPairIsRefusedAsAMemberOfNoComponent() {
+		assertEquals(UnboundFieldBesideInheritedPair.class.getName() + "'s field UnboundFieldBesideInheritedPair.name "
+				+ "carries @Unbound, but is a member of no component, so nothing reads it",
+				message(UnboundFieldBesideInheritedPair.class));
 	}
 
 	@Test
-	void anUnboundPrivateFieldNamedAsAnInheritedPublicFieldLeavesTheFieldBound() throws Throwable {
-		DataClassRecord record = record(UnboundFieldBesideInheritedPublicField.class);
-		assertEquals(List.of("name:String set"), shape(record));
-		UnboundFieldBesideInheritedPublicField value = new UnboundFieldBesideInheritedPublicField();
-		((NamedFieldBase) value).name = "anchor";
-		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
-		for (UnboundFieldBesideInheritedPublicField copy : roundTrips(value)) {
-			assertEquals("anchor", ((NamedFieldBase) copy).name);
-		}
+	void anUnboundPrivateFieldNamedAsAnInheritedPublicFieldIsRefusedAsAMemberOfNoComponent() {
+		assertEquals(UnboundFieldBesideInheritedPublicField.class.getName() + "'s field "
+				+ "UnboundFieldBesideInheritedPublicField.name carries @Unbound, but is a member of no component, so "
+				+ "nothing reads it", message(UnboundFieldBesideInheritedPublicField.class));
 	}
 
 	@Test
